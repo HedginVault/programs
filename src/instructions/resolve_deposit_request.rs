@@ -83,7 +83,7 @@ impl<'info> ResolveDepositRequest<'info> {
         let vault_acc_info = vault.to_account_info();
 
         let vault_key = vault.key();
-        let vault = &mut vault.load_mut()?;
+        let mut vault = vault.load_mut()?;
         let vault_id = vault.id.to_le_bytes();
         let vault_bump = vault.bump;
         let vault_seeds = vault_seeds!(vault_id, vault_bump);
@@ -106,6 +106,10 @@ impl<'info> ResolveDepositRequest<'info> {
 
         let amount = deposit_request.amount;
         let shares = vault.resolve_deposit(amount)?;
+        let nav_per_share = vault.nav_per_share;
+
+        // CPIs borrow every passed account, the vault signs so its data must not stay borrowed
+        drop(vault);
 
         transfer_checked(
             CpiContext::new(
@@ -142,7 +146,7 @@ impl<'info> ResolveDepositRequest<'info> {
             authority: depositor_key,
             amount,
             shares,
-            nav_per_share: vault.nav_per_share,
+            nav_per_share,
         });
 
         Ok(())

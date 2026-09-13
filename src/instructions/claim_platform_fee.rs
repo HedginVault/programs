@@ -58,7 +58,7 @@ impl<'info> ClaimPlatformFee<'info> {
         let vault_acc_info = vault.to_account_info();
 
         let vault_key = vault.key();
-        let vault = &mut vault.load_mut()?;
+        let mut vault = vault.load_mut()?;
         let vault_id = vault.id.to_le_bytes();
         let vault_bump = vault.bump;
         let vault_seeds = vault_seeds!(vault_id, vault_bump);
@@ -67,6 +67,9 @@ impl<'info> ClaimPlatformFee<'info> {
         vault.validate_share_mint(share_mint.key())?;
 
         let shares = vault.claim_platform_fee()?;
+
+        // CPIs borrow every passed account, the vault signs so its data must not stay borrowed
+        drop(vault);
 
         mint_to(
             CpiContext::new(
