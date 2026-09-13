@@ -4,7 +4,9 @@ import { DEPOSIT_MINT, DEPOSIT_MINT_DECIMALS } from "./params";
 import { fetchTokenProgram, log, program, run, wallet } from "./setup";
 
 const toBytes = (value: string, length: number) =>
-  Array.from(Buffer.from(value.padEnd(length, "\0"), "utf8").subarray(0, length));
+  Array.from(
+    Buffer.from(value.padEnd(length, "\0"), "utf8").subarray(0, length)
+  );
 
 describe("hedge_vault", () => {
   it("initialize_vault", async () => {

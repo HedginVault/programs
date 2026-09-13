@@ -14,10 +14,15 @@ describe("hedge_vault", () => {
     // the refund goes to the depositor's ATA, recreated here in case it was closed
     const createAta = createAssociatedTokenAccountIdempotentInstruction(
       wallet.publicKey,
-      getAssociatedTokenAddressSync(vault.depositMint, REQUEST_AUTHORITY, true, depositMintTokenProgram),
+      getAssociatedTokenAddressSync(
+        vault.depositMint,
+        REQUEST_AUTHORITY,
+        true,
+        depositMintTokenProgram
+      ),
       REQUEST_AUTHORITY,
       vault.depositMint,
-      depositMintTokenProgram,
+      depositMintTokenProgram
     );
 
     const ix = await program.methods

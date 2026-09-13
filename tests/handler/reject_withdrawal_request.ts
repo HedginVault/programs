@@ -3,7 +3,11 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { getConfigPda, getShareMintPda, getWithdrawalRequestPda } from "../../utils/pda";
+import {
+  getConfigPda,
+  getShareMintPda,
+  getWithdrawalRequestPda,
+} from "../../utils/pda";
 import { REQUEST_AUTHORITY, VAULT } from "./params";
 import { program, run, wallet } from "./setup";
 
@@ -14,10 +18,15 @@ describe("hedge_vault", () => {
     // the shares go back to the withdrawer's ATA, recreated here in case it was closed
     const createAta = createAssociatedTokenAccountIdempotentInstruction(
       wallet.publicKey,
-      getAssociatedTokenAddressSync(shareMint, REQUEST_AUTHORITY, true, TOKEN_PROGRAM_ID),
+      getAssociatedTokenAddressSync(
+        shareMint,
+        REQUEST_AUTHORITY,
+        true,
+        TOKEN_PROGRAM_ID
+      ),
       REQUEST_AUTHORITY,
       shareMint,
-      TOKEN_PROGRAM_ID,
+      TOKEN_PROGRAM_ID
     );
 
     const ix = await program.methods
