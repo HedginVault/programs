@@ -29,8 +29,9 @@ Withdrawals are capped per epoch by `max_epoch_outflow_bps`.
 
 **Manager**
 `initialize_vault` (requires Manager PDA) → `update_vault` / `close_vault` / `claim_manager_fee`
-Strategies: `initialize_/execute_/exit_strategy_jupiter_swap`,
-`initialize_/execute_/exit_strategy_meteora_dlmm`, `close_strategy`.
+Strategies: `jupiter_initialize_strategy` / `jupiter_swap`,
+`meteora_dlmm_initialize_position` / `meteora_dlmm_add_liquidity` / `meteora_dlmm_remove_liquidity` /
+`meteora_dlmm_claim_fee` (10% of claimed fees to the treasury), `close_strategy`.
 
 **User**
 `request_deposit` → (NAV posted in a later epoch) → `resolve_deposit_request`

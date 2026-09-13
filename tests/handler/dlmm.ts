@@ -7,7 +7,7 @@ import { HedgeVault } from "../../target/types/hedge_vault";
 import { DLMM_PROGRAM_ID } from "../../utils/constants";
 import { connection, program, wallet } from "./setup";
 
-/// Accounts and remaining accounts shared by the DLMM execute and exit handlers.
+/// Accounts and remaining accounts shared by the DLMM liquidity and claim fee handlers.
 export async function getDlmmContext(vault: PublicKey, lbPair: PublicKey, position: PublicKey) {
   const dlmm = await DLMM.create(connection, lbPair);
   const positionAccount = await program.account.positionV2.fetch(position);

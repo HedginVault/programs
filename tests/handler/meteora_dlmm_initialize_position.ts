@@ -6,7 +6,7 @@ import { LB_PAIR, VAULT } from "./params";
 import { connection, log, program, run, wallet } from "./setup";
 
 describe("hedge_vault", () => {
-  it("initialize_strategy_meteora_dlmm", async () => {
+  it("meteora_dlmm_initialize_position", async () => {
     const position = Keypair.generate();
     const width = 69;
 
@@ -20,7 +20,7 @@ describe("hedge_vault", () => {
     log("Bin range", `${lowerBinId} .. ${upperBinId} (active ${activeBinId})`);
 
     const ix = await program.methods
-      .initializeStrategyMeteoraDlmm(lowerBinId, upperBinId)
+      .meteoraDlmmInitializePosition(lowerBinId, upperBinId)
       .accounts({
         authority: wallet.publicKey,
         vault: VAULT,

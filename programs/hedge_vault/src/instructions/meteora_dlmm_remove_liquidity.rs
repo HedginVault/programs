@@ -8,23 +8,25 @@ use crate::{
     config_seeds,
     dlmm::{
         self,
-        cpi::{accounts::AddLiquidityByStrategy2, add_liquidity_by_strategy2},
-        types::{LiquidityParameterByStrategy, RemainingAccountsInfo},
+        accounts::PositionV2,
+        cpi::{accounts::RemoveLiquidityByRange2, remove_liquidity_by_range2},
+        types::RemainingAccountsInfo,
     },
     error::HedgeVaultError,
-    events::MeteoraDlmmExecuted,
+    events::MeteoraDlmmLiquidityRemoved,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct ExecuteStrategyMeteoraDlmmParams {
-    pub liquidity_parameter: LiquidityParameterByStrategy,
+pub struct MeteoraDlmmRemoveLiquidityParams {
+    /// Portion of liquidity to remove across the full position range.
+    pub bps_to_remove: u16,
     pub remaining_accounts_info: RemainingAccountsInfo,
 }
 
 #[derive(Accounts)]
-pub struct ExecuteStrategyMeteoraDlmm<'info> {
+pub struct MeteoraDlmmRemoveLiquidity<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
@@ -32,14 +34,16 @@ pub struct ExecuteStrategyMeteoraDlmm<'info> {
     #[account(mut)]
     pub strategy: Box<Account<'info, Strategy>>,
     #[account(
-        mut,
+        init_if_needed,
+        payer = authority,
         associated_token::mint = token_x_mint,
         associated_token::authority = vault,
         associated_token::token_program = token_x_program,
     )]
     pub vault_token_x: InterfaceAccount<'info, TokenAccount>,
     #[account(
-        mut,
+        init_if_needed,
+        payer = authority,
         associated_token::mint = token_y_mint,
         associated_token::authority = vault,
         associated_token::token_program = token_y_program,
@@ -47,7 +51,7 @@ pub struct ExecuteStrategyMeteoraDlmm<'info> {
     pub vault_token_y: InterfaceAccount<'info, TokenAccount>,
     /// CHECK: validated against strategy in [handler] and in dlmm program
     #[account(mut)]
-    pub position: UncheckedAccount<'info>,
+    pub position: AccountLoader<'info, PositionV2>,
     /// CHECK: validated in dlmm program
     #[account(mut)]
     pub lb_pair: UncheckedAccount<'info>,
@@ -65,6 +69,8 @@ pub struct ExecuteStrategyMeteoraDlmm<'info> {
     pub token_x_program: Interface<'info, TokenInterface>,
     pub token_y_program: Interface<'info, TokenInterface>,
     /// CHECK: validated in dlmm program
+    pub memo_program: UncheckedAccount<'info>,
+    /// CHECK: validated in dlmm program
     pub event_authority: UncheckedAccount<'info>,
     /// CHECK: DLMM Program
     #[account(address = dlmm::ID)]
@@ -73,12 +79,12 @@ pub struct ExecuteStrategyMeteoraDlmm<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> ExecuteStrategyMeteoraDlmm<'info> {
+impl<'info> MeteoraDlmmRemoveLiquidity<'info> {
     pub fn handler(
-        ctx: Context<'_, '_, '_, 'info, ExecuteStrategyMeteoraDlmm<'info>>,
-        params: ExecuteStrategyMeteoraDlmmParams,
+        ctx: Context<'_, '_, '_, 'info, MeteoraDlmmRemoveLiquidity<'info>>,
+        params: MeteoraDlmmRemoveLiquidityParams,
     ) -> Result<()> {
-        let ExecuteStrategyMeteoraDlmm {
+        let MeteoraDlmmRemoveLiquidity {
             authority,
             config,
             vault,
@@ -94,13 +100,14 @@ impl<'info> ExecuteStrategyMeteoraDlmm<'info> {
             token_y_mint,
             token_x_program,
             token_y_program,
+            memo_program,
             event_authority,
             dlmm_program,
             ..
         } = ctx.accounts;
 
-        let ExecuteStrategyMeteoraDlmmParams {
-            liquidity_parameter,
+        let MeteoraDlmmRemoveLiquidityParams {
+            bps_to_remove,
             remaining_accounts_info,
         } = params;
 
@@ -147,13 +154,18 @@ impl<'info> ExecuteStrategyMeteoraDlmm<'info> {
         strategy.record_action(now);
         drop(vault);
 
-        let (amount_x, amount_y) = (liquidity_parameter.amount_x, liquidity_parameter.amount_y);
+        let position_acc_info = position.to_account_info();
+        let position = position.load()?;
+        let lower_bin_id = position.lower_bin_id;
+        let upper_bin_id = position.upper_bin_id;
+        drop(position);
 
-        add_liquidity_by_strategy2(
+        // remove liquidity across the full position range, fees stay in the position until claimed
+        remove_liquidity_by_range2(
             CpiContext::new(
                 dlmm_program.to_account_info(),
-                AddLiquidityByStrategy2 {
-                    position: position.to_account_info(),
+                RemoveLiquidityByRange2 {
+                    position: position_acc_info,
                     lb_pair: lb_pair.to_account_info(),
                     bin_array_bitmap_extension: bin_array_bitmap_extension
                         .as_ref()
@@ -167,22 +179,24 @@ impl<'info> ExecuteStrategyMeteoraDlmm<'info> {
                     sender: vault_acc_info,
                     token_x_program: token_x_program.to_account_info(),
                     token_y_program: token_y_program.to_account_info(),
+                    memo_program: memo_program.to_account_info(),
                     event_authority: event_authority.to_account_info(),
                     program: dlmm_program.to_account_info(),
                 },
             )
             .with_signer(&[vault_seeds])
             .with_remaining_accounts(ctx.remaining_accounts.to_vec()),
-            liquidity_parameter,
+            lower_bin_id,
+            upper_bin_id,
+            bps_to_remove,
             remaining_accounts_info,
         )?;
 
-        emit!(MeteoraDlmmExecuted {
+        emit!(MeteoraDlmmLiquidityRemoved {
             vault: vault_key,
             strategy: strategy_key,
             position: position_key,
-            amount_x,
-            amount_y,
+            bps_to_remove,
         });
 
         Ok(())

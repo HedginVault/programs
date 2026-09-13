@@ -22,6 +22,10 @@ pub const NAV_PRECISION: u64 = 1_000_000_000;
 #[constant]
 pub const EPOCH_DURATION: i64 = 86_400; // 24h
 
+/// Share of fees claimed from a protocol position that is sent to the treasury.
+#[constant]
+pub const TREASURY_CLAIM_FEE_BPS: u16 = 1_000; // 10%
+
 /// Used to prorate annualized management fees.
 #[constant]
 pub const SECONDS_PER_YEAR: i64 = 31_536_000; // 365 days

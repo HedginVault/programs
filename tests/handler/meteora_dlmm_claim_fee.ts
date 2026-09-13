@@ -5,8 +5,8 @@ import { DLMM_POSITION, LB_PAIR, VAULT } from "./params";
 import { program, run } from "./setup";
 
 describe("hedge_vault", () => {
-  it("exit_strategy_meteora_dlmm", async () => {
-    const bpsToRemove = 10_000; // 100 %
+  it("meteora_dlmm_claim_fee", async () => {
+    const config = await program.account.config.fetch(getConfigPda());
 
     const { accounts, remainingAccountsInfo, remainingAccounts } = await getDlmmContext(
       VAULT,
@@ -15,11 +15,12 @@ describe("hedge_vault", () => {
     );
 
     const ix = await program.methods
-      .exitStrategyMeteoraDlmm({ bpsToRemove, remainingAccountsInfo })
+      .meteoraDlmmClaimFee(remainingAccountsInfo)
       .accounts({
         ...accounts,
         config: getConfigPda(),
         strategy: getStrategyPda(VAULT, DLMM_POSITION),
+        treasuryAuthority: config.treasuryAuthority,
         memoProgram: MEMO_PROGRAM_ID,
         eventAuthority: DLMM_EVENT_AUTHORITY,
       })

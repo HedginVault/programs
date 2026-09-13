@@ -7,7 +7,7 @@ import { DLMM_POSITION, LB_PAIR, VAULT } from "./params";
 import { log, program, run } from "./setup";
 
 describe("hedge_vault", () => {
-  it("execute_strategy_meteora_dlmm", async () => {
+  it("meteora_dlmm_add_liquidity", async () => {
     const amountX = new BN(0);
     const amountY = new BN(1_000_000);
     const maxActiveBinSlippage = 50;
@@ -34,7 +34,7 @@ describe("hedge_vault", () => {
     };
 
     const ix = await program.methods
-      .executeStrategyMeteoraDlmm(params)
+      .meteoraDlmmAddLiquidity(params)
       .accounts({
         ...accounts,
         config: getConfigPda(),

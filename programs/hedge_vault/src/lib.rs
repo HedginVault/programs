@@ -119,53 +119,49 @@ pub mod hedge_vault {
         ResolveWithdrawalRequest::handler(ctx)
     }
 
-    // Strategy - Jupiter Swap
+    // Jupiter
 
-    pub fn initialize_strategy_jupiter_swap(
-        ctx: Context<InitializeStrategyJupiterSwap>,
-    ) -> Result<()> {
-        InitializeStrategyJupiterSwap::handler(ctx)
+    pub fn jupiter_initialize_strategy(ctx: Context<JupiterInitializeStrategy>) -> Result<()> {
+        JupiterInitializeStrategy::handler(ctx)
     }
 
-    pub fn execute_strategy_jupiter_swap<'info>(
-        ctx: Context<'_, '_, '_, 'info, ExecuteStrategyJupiterSwap<'info>>,
+    pub fn jupiter_swap<'info>(
+        ctx: Context<'_, '_, '_, 'info, JupiterSwap<'info>>,
         swap_data: Vec<u8>,
         amount: u64,
         slippage_bps: u16,
     ) -> Result<()> {
-        ExecuteStrategyJupiterSwap::handler(ctx, swap_data, amount, slippage_bps)
+        JupiterSwap::handler(ctx, swap_data, amount, slippage_bps)
     }
 
-    pub fn exit_strategy_jupiter_swap<'info>(
-        ctx: Context<'_, '_, '_, 'info, ExitStrategyJupiterSwap<'info>>,
-        swap_data: Vec<u8>,
-        amount: u64,
-        slippage_bps: u16,
-    ) -> Result<()> {
-        ExitStrategyJupiterSwap::handler(ctx, swap_data, amount, slippage_bps)
-    }
+    // Meteora DLMM
 
-    // Strategy - Meteora DLMM
-
-    pub fn initialize_strategy_meteora_dlmm(
-        ctx: Context<InitializeStrategyMeteoraDlmm>,
+    pub fn meteora_dlmm_initialize_position(
+        ctx: Context<MeteoraDlmmInitializePosition>,
         lower_bin_id: i32,
         upper_bin_id: i32,
     ) -> Result<()> {
-        InitializeStrategyMeteoraDlmm::handler(ctx, lower_bin_id, upper_bin_id)
+        MeteoraDlmmInitializePosition::handler(ctx, lower_bin_id, upper_bin_id)
     }
 
-    pub fn execute_strategy_meteora_dlmm<'info>(
-        ctx: Context<'_, '_, '_, 'info, ExecuteStrategyMeteoraDlmm<'info>>,
-        params: ExecuteStrategyMeteoraDlmmParams,
+    pub fn meteora_dlmm_add_liquidity<'info>(
+        ctx: Context<'_, '_, '_, 'info, MeteoraDlmmAddLiquidity<'info>>,
+        params: MeteoraDlmmAddLiquidityParams,
     ) -> Result<()> {
-        ExecuteStrategyMeteoraDlmm::handler(ctx, params)
+        MeteoraDlmmAddLiquidity::handler(ctx, params)
     }
 
-    pub fn exit_strategy_meteora_dlmm<'info>(
-        ctx: Context<'_, '_, '_, 'info, ExitStrategyMeteoraDlmm<'info>>,
-        params: ExitStrategyMeteoraDlmmParams,
+    pub fn meteora_dlmm_remove_liquidity<'info>(
+        ctx: Context<'_, '_, '_, 'info, MeteoraDlmmRemoveLiquidity<'info>>,
+        params: MeteoraDlmmRemoveLiquidityParams,
     ) -> Result<()> {
-        ExitStrategyMeteoraDlmm::handler(ctx, params)
+        MeteoraDlmmRemoveLiquidity::handler(ctx, params)
+    }
+
+    pub fn meteora_dlmm_claim_fee<'info>(
+        ctx: Context<'_, '_, '_, 'info, MeteoraDlmmClaimFee<'info>>,
+        remaining_accounts_info: dlmm::types::RemainingAccountsInfo,
+    ) -> Result<()> {
+        MeteoraDlmmClaimFee::handler(ctx, remaining_accounts_info)
     }
 }

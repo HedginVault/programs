@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{Mint, TokenAccount, TokenInterface},
+    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 
 use crate::{
@@ -9,27 +9,18 @@ use crate::{
     dlmm::{
         self,
         accounts::PositionV2,
-        cpi::{
-            accounts::{ClaimFee2, RemoveLiquidityByRange2},
-            claim_fee2, remove_liquidity_by_range2,
-        },
+        cpi::{accounts::ClaimFee2, claim_fee2},
         types::RemainingAccountsInfo,
     },
     error::HedgeVaultError,
-    events::MeteoraDlmmExited,
+    events::MeteoraDlmmFeeClaimed,
     seeds::{CONFIG, STRATEGY, VAULT},
-    strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
+    strategy_seeds, validate, vault_seeds, Config, SafeConvert, SafeMath, Strategy, StrategyType,
+    Vault, MAX_BPS, TREASURY_CLAIM_FEE_BPS,
 };
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct ExitStrategyMeteoraDlmmParams {
-    /// Portion of liquidity to remove across the full position range, 0 only claims fees.
-    pub bps_to_remove: u16,
-    pub remaining_accounts_info: RemainingAccountsInfo,
-}
-
 #[derive(Accounts)]
-pub struct ExitStrategyMeteoraDlmm<'info> {
+pub struct MeteoraDlmmClaimFee<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
@@ -37,21 +28,37 @@ pub struct ExitStrategyMeteoraDlmm<'info> {
     #[account(mut)]
     pub strategy: Box<Account<'info, Strategy>>,
     #[account(
-        init_if_needed,
-        payer = authority,
+        mut,
         associated_token::mint = token_x_mint,
         associated_token::authority = vault,
         associated_token::token_program = token_x_program,
     )]
-    pub vault_token_x: InterfaceAccount<'info, TokenAccount>,
+    pub vault_token_x: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
-        init_if_needed,
-        payer = authority,
+        mut,
         associated_token::mint = token_y_mint,
         associated_token::authority = vault,
         associated_token::token_program = token_y_program,
     )]
-    pub vault_token_y: InterfaceAccount<'info, TokenAccount>,
+    pub vault_token_y: Box<InterfaceAccount<'info, TokenAccount>>,
+    /// CHECK: validated against config in [handler]
+    pub treasury_authority: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = authority,
+        associated_token::mint = token_x_mint,
+        associated_token::authority = treasury_authority,
+        associated_token::token_program = token_x_program,
+    )]
+    pub treasury_token_x: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(
+        init_if_needed,
+        payer = authority,
+        associated_token::mint = token_y_mint,
+        associated_token::authority = treasury_authority,
+        associated_token::token_program = token_y_program,
+    )]
+    pub treasury_token_y: Box<InterfaceAccount<'info, TokenAccount>>,
     /// CHECK: validated against strategy in [handler] and in dlmm program
     #[account(mut)]
     pub position: AccountLoader<'info, PositionV2>,
@@ -60,15 +67,12 @@ pub struct ExitStrategyMeteoraDlmm<'info> {
     pub lb_pair: UncheckedAccount<'info>,
     /// CHECK: validated in dlmm program
     #[account(mut)]
-    pub bin_array_bitmap_extension: Option<UncheckedAccount<'info>>,
-    /// CHECK: validated in dlmm program
-    #[account(mut)]
     pub reserve_x: UncheckedAccount<'info>,
     /// CHECK: validated in dlmm program
     #[account(mut)]
     pub reserve_y: UncheckedAccount<'info>,
-    pub token_x_mint: InterfaceAccount<'info, Mint>,
-    pub token_y_mint: InterfaceAccount<'info, Mint>,
+    pub token_x_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub token_y_mint: Box<InterfaceAccount<'info, Mint>>,
     pub token_x_program: Interface<'info, TokenInterface>,
     pub token_y_program: Interface<'info, TokenInterface>,
     /// CHECK: validated in dlmm program
@@ -82,21 +86,23 @@ pub struct ExitStrategyMeteoraDlmm<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> ExitStrategyMeteoraDlmm<'info> {
+impl<'info> MeteoraDlmmClaimFee<'info> {
     pub fn handler(
-        ctx: Context<'_, '_, '_, 'info, ExitStrategyMeteoraDlmm<'info>>,
-        params: ExitStrategyMeteoraDlmmParams,
+        ctx: Context<'_, '_, '_, 'info, MeteoraDlmmClaimFee<'info>>,
+        remaining_accounts_info: RemainingAccountsInfo,
     ) -> Result<()> {
-        let ExitStrategyMeteoraDlmm {
+        let MeteoraDlmmClaimFee {
             authority,
             config,
             vault,
             strategy,
             vault_token_x,
             vault_token_y,
+            treasury_authority,
+            treasury_token_x,
+            treasury_token_y,
             position,
             lb_pair,
-            bin_array_bitmap_extension,
             reserve_x,
             reserve_y,
             token_x_mint,
@@ -109,11 +115,6 @@ impl<'info> ExitStrategyMeteoraDlmm<'info> {
             ..
         } = ctx.accounts;
 
-        let ExitStrategyMeteoraDlmmParams {
-            bps_to_remove,
-            remaining_accounts_info,
-        } = params;
-
         let vault_acc_info = vault.to_account_info();
 
         let config_key = config.key();
@@ -122,6 +123,7 @@ impl<'info> ExitStrategyMeteoraDlmm<'info> {
 
         Config::validate_address(config_seeds, config_key)?;
         config.is_protocol_operational()?;
+        config.validate_treasury_authority(treasury_authority.key())?;
 
         let vault_key = vault.key();
         let vault = vault.load()?;
@@ -163,41 +165,8 @@ impl<'info> ExitStrategyMeteoraDlmm<'info> {
         let upper_bin_id = position.upper_bin_id;
         drop(position);
 
-        let bin_array_bitmap_extension = bin_array_bitmap_extension
-            .as_ref()
-            .map(|acc| acc.to_account_info());
-
-        // remove liquidity across the full position range
-        if bps_to_remove > 0 {
-            remove_liquidity_by_range2(
-                CpiContext::new(
-                    dlmm_program.to_account_info(),
-                    RemoveLiquidityByRange2 {
-                        position: position_acc_info.clone(),
-                        lb_pair: lb_pair.to_account_info(),
-                        bin_array_bitmap_extension,
-                        user_token_x: vault_token_x.to_account_info(),
-                        user_token_y: vault_token_y.to_account_info(),
-                        reserve_x: reserve_x.to_account_info(),
-                        reserve_y: reserve_y.to_account_info(),
-                        token_x_mint: token_x_mint.to_account_info(),
-                        token_y_mint: token_y_mint.to_account_info(),
-                        sender: vault_acc_info.clone(),
-                        token_x_program: token_x_program.to_account_info(),
-                        token_y_program: token_y_program.to_account_info(),
-                        memo_program: memo_program.to_account_info(),
-                        event_authority: event_authority.to_account_info(),
-                        program: dlmm_program.to_account_info(),
-                    },
-                )
-                .with_signer(&[vault_seeds])
-                .with_remaining_accounts(ctx.remaining_accounts.to_vec()),
-                lower_bin_id,
-                upper_bin_id,
-                bps_to_remove,
-                remaining_accounts_info.clone(),
-            )?;
-        }
+        let balance_x_before = vault_token_x.amount;
+        let balance_y_before = vault_token_y.amount;
 
         // claim all position fees
         claim_fee2(
@@ -206,7 +175,7 @@ impl<'info> ExitStrategyMeteoraDlmm<'info> {
                 ClaimFee2 {
                     lb_pair: lb_pair.to_account_info(),
                     position: position_acc_info,
-                    sender: vault_acc_info,
+                    sender: vault_acc_info.clone(),
                     reserve_x: reserve_x.to_account_info(),
                     reserve_y: reserve_y.to_account_info(),
                     user_token_x: vault_token_x.to_account_info(),
@@ -227,13 +196,76 @@ impl<'info> ExitStrategyMeteoraDlmm<'info> {
             remaining_accounts_info,
         )?;
 
-        emit!(MeteoraDlmmExited {
+        // measured by balance change so token transfer fees are accounted for
+        vault_token_x.reload()?;
+        vault_token_y.reload()?;
+        let amount_x = vault_token_x.amount.safe_sub(balance_x_before)?;
+        let amount_y = vault_token_y.amount.safe_sub(balance_y_before)?;
+
+        let treasury_amount_x = transfer_treasury_fee(
+            amount_x,
+            vault_token_x,
+            treasury_token_x,
+            token_x_mint,
+            token_x_program,
+            vault_acc_info.clone(),
+            vault_seeds,
+        )?;
+        let treasury_amount_y = transfer_treasury_fee(
+            amount_y,
+            vault_token_y,
+            treasury_token_y,
+            token_y_mint,
+            token_y_program,
+            vault_acc_info,
+            vault_seeds,
+        )?;
+
+        emit!(MeteoraDlmmFeeClaimed {
             vault: vault_key,
             strategy: strategy_key,
             position: position_key,
-            bps_to_remove,
+            amount_x,
+            amount_y,
+            treasury_amount_x,
+            treasury_amount_y,
         });
 
         Ok(())
     }
+}
+
+/// Sends [TREASURY_CLAIM_FEE_BPS] of a claimed amount from the vault to the treasury, returns the amount sent.
+fn transfer_treasury_fee<'info>(
+    claimed_amount: u64,
+    vault_token_account: &InterfaceAccount<'info, TokenAccount>,
+    treasury_token_account: &InterfaceAccount<'info, TokenAccount>,
+    mint: &InterfaceAccount<'info, Mint>,
+    token_program: &Interface<'info, TokenInterface>,
+    vault: AccountInfo<'info>,
+    vault_seeds: &[&[u8]],
+) -> Result<u64> {
+    let amount = (claimed_amount as u128)
+        .safe_mul(TREASURY_CLAIM_FEE_BPS as u128)?
+        .safe_div(MAX_BPS as u128)?
+        .safe_to_u64()?;
+
+    if amount > 0 {
+        transfer_checked(
+            CpiContext::new(
+                token_program.to_account_info(),
+                TransferChecked {
+                    from: vault_token_account.to_account_info(),
+                    mint: mint.to_account_info(),
+                    to: treasury_token_account.to_account_info(),
+                    authority: vault,
+                },
+            )
+            .with_signer(&[vault_seeds]),
+            amount,
+            mint.decimals,
+        )?;
+    }
+
+    Ok(amount)
 }

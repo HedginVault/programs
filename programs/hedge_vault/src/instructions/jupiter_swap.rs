@@ -7,15 +7,15 @@ use anchor_spl::{
 use crate::{
     config_seeds,
     error::HedgeVaultError,
-    events::JupiterSwapExecuted,
+    events::JupiterSwapped,
     jupiter,
-    protocol::jupiter::{JupiterSwap, JUPITER_AGGREGATOR_EVENT_AUTHORITY},
+    protocol::jupiter::{JupiterSwapCpi, JUPITER_AGGREGATOR_EVENT_AUTHORITY},
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
 };
 
 #[derive(Accounts)]
-pub struct ExecuteStrategyJupiterSwap<'info> {
+pub struct JupiterSwap<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
@@ -31,11 +31,11 @@ pub struct ExecuteStrategyJupiterSwap<'info> {
         payer = authority,
         associated_token::mint = destination_mint,
         associated_token::authority = vault,
-        associated_token::token_program = token_program,
+        associated_token::token_program = destination_token_program,
     )]
     pub vault_destination_token_account: InterfaceAccount<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
-    pub token_program: Interface<'info, TokenInterface>,
+    pub destination_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     /// CHECK: Jupiter event authority
     #[account(address = JUPITER_AGGREGATOR_EVENT_AUTHORITY)]
@@ -45,14 +45,14 @@ pub struct ExecuteStrategyJupiterSwap<'info> {
     pub jupiter_program: UncheckedAccount<'info>,
 }
 
-impl<'info> ExecuteStrategyJupiterSwap<'info> {
+impl<'info> JupiterSwap<'info> {
     pub fn handler(
-        ctx: Context<'_, '_, '_, 'info, ExecuteStrategyJupiterSwap<'info>>,
+        ctx: Context<'_, '_, '_, 'info, JupiterSwap<'info>>,
         swap_data: Vec<u8>,
         amount: u64,
         slippage_bps: u16,
     ) -> Result<()> {
-        let ExecuteStrategyJupiterSwap {
+        let JupiterSwap {
             authority,
             config,
             vault,
@@ -61,7 +61,7 @@ impl<'info> ExecuteStrategyJupiterSwap<'info> {
             destination_mint,
             vault_source_token_account,
             vault_destination_token_account,
-            token_program,
+            destination_token_program,
             event_authority,
             jupiter_program,
             ..
@@ -84,14 +84,19 @@ impl<'info> ExecuteStrategyJupiterSwap<'info> {
 
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.validate_authority(authority.key())?;
-        vault.validate_deposit_mint(source_mint.key())?;
 
-        let strategy_token_mint_key = destination_mint.key();
+        // one side of the swap is the deposit mint, the other is the strategy target mint
+        let target_mint = if source_mint.key() == vault.deposit_mint {
+            destination_mint.key()
+        } else {
+            vault.validate_deposit_mint(destination_mint.key())?;
+            source_mint.key()
+        };
 
         let strategy_key = strategy.key();
         let strategy: &mut Strategy = strategy.as_mut();
         let strategy_bump = strategy.bump;
-        let strategy_seeds = strategy_seeds!(vault_key, strategy_token_mint_key, strategy_bump);
+        let strategy_seeds = strategy_seeds!(vault_key, target_mint, strategy_bump);
 
         Strategy::validate_address(strategy_seeds, strategy_key)?;
 
@@ -102,19 +107,18 @@ impl<'info> ExecuteStrategyJupiterSwap<'info> {
             return err!(HedgeVaultError::InvalidStrategyType);
         };
 
-        // swapping into target mint
         validate!(
-            strategy_target_mint == destination_mint.key(),
-            HedgeVaultError::InvalidDestinationMint
+            strategy_target_mint == target_mint,
+            HedgeVaultError::InvalidTargetMint
         )?;
 
         let now = Clock::get()?.unix_timestamp;
         strategy.record_action(now);
         drop(vault);
 
-        JupiterSwap::check_amount_and_slippage(&swap_data, amount, slippage_bps)?;
+        JupiterSwapCpi::check_amount_and_slippage(&swap_data, amount, slippage_bps)?;
 
-        let mut jupiter_swap = JupiterSwap {
+        let mut jupiter_swap = JupiterSwapCpi {
             event_authority: event_authority.to_account_info(),
             source_mint: source_mint.to_account_info(),
             source_token_account: vault_source_token_account.to_account_info(),
@@ -122,12 +126,12 @@ impl<'info> ExecuteStrategyJupiterSwap<'info> {
             destination_mint: destination_mint.to_account_info(),
             destination_token_account: vault_destination_token_account.to_account_info(),
             token_account_authority: vault_acc_info,
-            token_program: token_program.to_account_info(),
+            token_program: destination_token_program.to_account_info(),
         };
 
         jupiter_swap.swap(&swap_data, ctx.remaining_accounts, vault_seeds)?;
 
-        emit!(JupiterSwapExecuted {
+        emit!(JupiterSwapped {
             vault: vault_key,
             strategy: strategy_key,
             source_mint: source_mint.key(),

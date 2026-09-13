@@ -19,29 +19,29 @@ pub use close_strategy::*;
 pub mod close_vault;
 pub use close_vault::*;
 
-pub mod execute_strategy_jupiter_swap;
-pub use execute_strategy_jupiter_swap::*;
-
-pub mod execute_strategy_meteora_dlmm;
-pub use execute_strategy_meteora_dlmm::*;
-
-pub mod exit_strategy_jupiter_swap;
-pub use exit_strategy_jupiter_swap::*;
-
-pub mod exit_strategy_meteora_dlmm;
-pub use exit_strategy_meteora_dlmm::*;
-
 pub mod initialize_config;
 pub use initialize_config::*;
 
-pub mod initialize_strategy_jupiter_swap;
-pub use initialize_strategy_jupiter_swap::*;
-
-pub mod initialize_strategy_meteora_dlmm;
-pub use initialize_strategy_meteora_dlmm::*;
-
 pub mod initialize_vault;
 pub use initialize_vault::*;
+
+pub mod jupiter_initialize_strategy;
+pub use jupiter_initialize_strategy::*;
+
+pub mod jupiter_swap;
+pub use jupiter_swap::*;
+
+pub mod meteora_dlmm_add_liquidity;
+pub use meteora_dlmm_add_liquidity::*;
+
+pub mod meteora_dlmm_claim_fee;
+pub use meteora_dlmm_claim_fee::*;
+
+pub mod meteora_dlmm_initialize_position;
+pub use meteora_dlmm_initialize_position::*;
+
+pub mod meteora_dlmm_remove_liquidity;
+pub use meteora_dlmm_remove_liquidity::*;
 
 pub mod migrate_config;
 pub use migrate_config::*;

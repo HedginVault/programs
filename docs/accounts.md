@@ -217,7 +217,7 @@ Derived value used by `update_nav`: `virtual_supply = share_mint.supply + unclai
 | --- | --- | --- | --- |
 | Share mint | `["share_mint", vault]` | — | SPL Token mint, decimals = deposit mint decimals, mint authority = vault, no freeze authority. `supply` = shares held by users plus escrow. |
 | Vault token account | ATA(vault, deposit_mint) | deposit mint | Idle funds. Source for strategy deployments and withdrawal payouts. |
-| Strategy token accounts | ATA(vault, any mint) | any | Created on demand by strategy execute/exit (Jupiter target mints, DLMM token X/Y). |
+| Strategy token accounts | ATA(vault, any mint) | any | Created on demand by `jupiter_swap` and `meteora_dlmm_remove_liquidity` (Jupiter target mints, DLMM token X/Y). |
 | Deposit escrow | `["deposit_escrow", vault]` | deposit mint | Pending deposits. Balance always equals `vault.pending_deposits`. |
 | Share escrow | `["share_escrow", vault]` | share mint | Pending withdrawal shares. Balance always equals `vault.pending_withdrawal_shares`. Shares are burned from here on resolve. |
 
@@ -227,15 +227,15 @@ Derived value used by `update_nav`: `virtual_supply = share_mint.supply + unclai
 | --- | --- |
 | Seeds | `["strategy", vault, protocol_account]` |
 | Layout | borsh, 97 bytes, version 1 |
-| Created by | `initialize_strategy_jupiter_swap`, `initialize_strategy_meteora_dlmm` (manager) |
-| Mutated by | execute/exit (`last_action_ts` only) |
+| Created by | `jupiter_initialize_strategy`, `meteora_dlmm_initialize_position` (manager) |
+| Mutated by | `jupiter_swap`, `meteora_dlmm_*` liquidity and claim fee actions (`last_action_ts` only) |
 | Closed by | `close_strategy`; also closes the protocol account if it is empty |
 
 | Field | Type | Description |
 | --- | --- | --- |
 | `vault` | `Pubkey` | Parent vault. |
 | `created_ts` | `i64` | Creation timestamp. |
-| `last_action_ts` | `i64` | Last execute or exit. |
+| `last_action_ts` | `i64` | Last protocol action. |
 | `id` | `u32` | Sequential within the vault. |
 | `bump` | `u8` | PDA bump. |
 | `version` | `u8` | Layout version, currently 1. |
@@ -336,5 +336,6 @@ NAV updater never need to diff account snapshots.
 | `DepositRequested`, `DepositCancelled`, `DepositResolved` | deposit flow | vault, authority, amount, pending_amount, epoch, shares, nav_per_share |
 | `WithdrawalRequested`, `WithdrawalCancelled`, `WithdrawalResolved` | withdrawal flow | vault, authority, shares, pending_shares, epoch, amount, nav_per_share |
 | `StrategyInitialized`, `StrategyClosed` | strategy lifecycle | vault, strategy, id, strategy_type |
-| `JupiterSwapExecuted`, `JupiterSwapExited` | Jupiter strategy | vault, strategy, source/destination mint, amount |
-| `MeteoraDlmmExecuted`, `MeteoraDlmmExited` | DLMM strategy | vault, strategy, position, amount_x/amount_y or bps_to_remove |
+| `JupiterSwapped` | `jupiter_swap` | vault, strategy, source/destination mint, amount |
+| `MeteoraDlmmLiquidityAdded`, `MeteoraDlmmLiquidityRemoved` | DLMM liquidity | vault, strategy, position, amount_x/amount_y or bps_to_remove |
+| `MeteoraDlmmFeeClaimed` | `meteora_dlmm_claim_fee` | vault, strategy, position, claimed amount_x/amount_y, treasury_amount_x/treasury_amount_y |
