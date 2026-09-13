@@ -150,7 +150,7 @@ flowchart TB
 | Account | Kind | Size | Free bytes | Lifetime |
 | --- | --- | --- | --- | --- |
 | Config | zero-copy | 160 | 6 | forever, singleton |
-| Vault | zero-copy | 424 | 117 | years |
+| Vault | zero-copy | 424 | 89 | years |
 | Manager | borsh | 41 | 0 | until removed |
 | Strategy | borsh | 97 | 2 (before enum) | until closed |
 | DepositRequest / WithdrawalRequest | borsh | 89 | 0 | one or two epochs |
@@ -277,6 +277,8 @@ Planned carve-up of the reserve, in order of appearance:
 | `min_nav_updaters` | 1 | 2 | attestation quorum | single updater |
 | remaining | 127 | — | phases 3–4 | — |
 
+Shipped: `pending_admin` (bytes 168–199), used by `accept_admin`.
+
 Migration: `migrate_config`, admin-signed, checks the account is exactly the 160-byte v1
 layout and the signer is its admin, tops up rent, resizes to 352, sets `version = 2`.
 One transaction, done once.
@@ -318,6 +320,8 @@ title Vault v2 - same 424 bytes, padding carved (bytes 312-423)
 | `last_override_ts`, `nav_update_count` | 2 | override audit, rate limit |
 | `total_deposited`, `total_withdrawn` | 3 | lifetime stats for UI and fee analytics |
 | `epoch_inflow` | 3 | deposit cap per epoch |
+
+Shipped: `min_deposit`, `min_withdrawal_shares`, `fee_effective_ts`, `pending_*_fee_bps` at the offsets above, with a fixed 7-day `FEE_INCREASE_DELAY`. The other rows remain named reserved bytes in the struct.
 
 No realloc is needed for Vault through Phase 3.
 
@@ -389,7 +393,7 @@ flowchart TB
 
 | Action | Today | Target |
 | --- | --- | --- |
-| change config, fees, bounds | admin key, immediate | multisig, `timelock_secs` delay, two-step admin transfer |
+| change config, fees, bounds | admin key, immediate; two-step admin transfer; manager fee increases delayed 7 days | multisig, `timelock_secs` delay |
 | pause | guardian key | any guardian in the set, plus an automated pause bot |
 | unpause | admin | admin multisig |
 | post NAV | one updater key | N-of-M attestations (Section 6) |

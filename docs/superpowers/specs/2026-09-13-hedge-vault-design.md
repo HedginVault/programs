@@ -84,7 +84,21 @@ The updater is centralized, so `update_nav` is hardened in layers:
   (config.treasury_authority) mint unclaimed fee shares to the claimant's
   share ATA. Claimants exit through the normal withdrawal request flow.
 
+## Security hardening (2026-09-14)
+
+From the Solana Foundation async vault comparison:
+
+- Deposit mint allowlist for Token-2022 extensions, checked at vault creation and on every deposit request.
+- Deposits close while `nav_per_share == 0`; such deposits become cancellable; resolutions that mint 0 shares fail.
+- Per-vault `min_deposit` and `min_withdrawal_shares` (full-balance withdrawals always allowed).
+- Manager fee increases apply 7 days later at the first NAV update; decreases are immediate.
+- Two-step admin transfer (`update_config.pending_admin` → `accept_admin`).
+- `reject_deposit_request` / `reject_withdrawal_request` for the admin.
+- Vault-signed CPIs run after the vault account borrow is released (resolve, cancel, fee claim and reject handlers).
+- Unit tests (`cargo test -p hedge_vault`) and LiteSVM integration tests (`tests/litesvm`).
+- Parked: pricing a request at the first NAV after it (settlement at `update_nav`).
+
 ## Out of scope
 
 Locked profit, deposit/withdrawal fees, treasury PDA, Kamino, DAMM v2,
-Flash Trade, tests, deployment.
+Flash Trade, deployment.
