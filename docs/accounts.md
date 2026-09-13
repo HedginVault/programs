@@ -36,6 +36,8 @@ erDiagram
         u16 max_epoch_outflow_bps "per epoch"
         ProtocolStatus status
         u8 bump
+        u8 version "layout version, 2"
+        u64_23 reserve "184 bytes"
     }
 
     MANAGER {
@@ -66,6 +68,7 @@ erDiagram
         VaultStatus status
         u8 next_strategy_id "auto-increment"
         u8 bump
+        u8 version "layout version, 1"
     }
 
     SHARE_MINT {
@@ -99,6 +102,7 @@ erDiagram
         i64 last_action_ts
         u8 id "unique within vault"
         u8 bump
+        u8 version "layout version, 1"
         StrategyType strategy_type "JupiterSwap or MeteoraDlmm"
     }
 
@@ -130,9 +134,9 @@ erDiagram
 | | |
 | --- | --- |
 | Seeds | `["config"]` |
-| Layout | zero-copy, 160 bytes |
+| Layout | zero-copy, 352 bytes (v2; the v1 account deployed at 160 bytes is grown once by `migrate_config`) |
 | Created by | `initialize_config` (admin = signer) |
-| Mutated by | `update_config`, `pause_protocol`, `initialize_vault` (`next_vault_id`) |
+| Mutated by | `update_config`, `pause_protocol`, `migrate_config`, `initialize_vault` (`next_vault_id`) |
 | Closed by | never |
 
 | Field | Type | Description |
@@ -148,6 +152,8 @@ erDiagram
 | `max_epoch_outflow_bps` | `u16` | Withdrawal resolutions fail once payouts since the last NAV update exceed this share of total assets. |
 | `status` | `ProtocolStatus` | `Normal` (0), `Paused` (1), `ReduceOnly` (2). Starts `Paused`. |
 | `bump` | `u8` | PDA bump. |
+| `version` | `u8` | Layout version, currently 2. `migrate_config` sets it after growing a v1 account. |
+| `reserve` | `[u64; 23]` | 184 zeroed bytes for future fields. Appended fields treat 0 as "not set". |
 
 Status gates: `Normal` required for deposits, vault creation, strategy execute/exit and deposit resolution. `Paused` blocks withdrawal requests and resolutions too. `update_nav`, `override_nav` and fee claims are never gated.
 
@@ -172,7 +178,7 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | | |
 | --- | --- |
 | Seeds | `["vault", id (u64 LE), authority]` |
-| Layout | zero-copy, 424 bytes (120 reserved) |
+| Layout | zero-copy, 424 bytes (120 reserved), version 1 |
 | Created by | `initialize_vault` (manager) |
 | Mutated by | `update_vault`, `update_nav`, `override_nav`, request/cancel/resolve, fee claims, strategy init |
 | Closed by | `close_vault` when share supply, pending totals and unclaimed fee shares are all 0 |
@@ -201,6 +207,7 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | `status` | `VaultStatus` | `Normal` (0), `Paused` (1), `ReduceOnly` (2). Starts `Normal`. |
 | `next_strategy_id` | `u8` | Incremented on every strategy init. |
 | `bump` | `u8` | PDA bump. |
+| `version` | `u8` | Layout version, currently 1. |
 
 Derived value used by `update_nav`: `virtual_supply = share_mint.supply + unclaimed_manager_fee_shares + unclaimed_platform_fee_shares`.
 
@@ -219,7 +226,7 @@ Derived value used by `update_nav`: `virtual_supply = share_mint.supply + unclai
 | | |
 | --- | --- |
 | Seeds | `["strategy", vault, protocol_account]` |
-| Layout | borsh, 97 bytes |
+| Layout | borsh, 97 bytes, version 1 |
 | Created by | `initialize_strategy_jupiter_swap`, `initialize_strategy_meteora_dlmm` (manager) |
 | Mutated by | execute/exit (`last_action_ts` only) |
 | Closed by | `close_strategy`; also closes the protocol account if it is empty |
@@ -231,6 +238,7 @@ Derived value used by `update_nav`: `virtual_supply = share_mint.supply + unclai
 | `last_action_ts` | `i64` | Last execute or exit. |
 | `id` | `u8` | Sequential within the vault. |
 | `bump` | `u8` | PDA bump. |
+| `version` | `u8` | Layout version, currently 1. |
 | `strategy_type` | `StrategyType` | Enum, see below. |
 
 `StrategyType` (borsh, 1 tag byte + 32 bytes):
@@ -312,3 +320,21 @@ flowchart TD
     J -- no, update_nav --> X2[error NavDeviationExceeded, admin may override_nav]
     J -- yes or override_nav --> I[store nav, hwm = max, epoch, ts, unclaimed += fee shares, epoch_outflow = 0]
 ```
+
+## Events
+
+Every state transition emits an Anchor event (`emit!`, program log data) so indexers and the
+NAV updater never need to diff account snapshots.
+
+| Event | Emitted by | Key fields |
+| --- | --- | --- |
+| `ConfigInitialized`, `ConfigUpdated`, `ConfigMigrated`, `ProtocolPaused` | config instructions | authorities, fee and bound bps, status, version |
+| `ManagerAdded`, `ManagerRemoved` | `add_manager`, `remove_manager` | authority |
+| `VaultInitialized`, `VaultUpdated`, `VaultClosed` | vault instructions | vault, id, authority, mints, fees, cap, status |
+| `NavUpdated` | `update_nav`, `override_nav` | vault, epoch, total_assets, nav_per_share, high_water_mark, fee shares, `overridden` |
+| `ManagerFeeClaimed`, `PlatformFeeClaimed` | fee claims | vault, authority, shares |
+| `DepositRequested`, `DepositCancelled`, `DepositResolved` | deposit flow | vault, authority, amount, pending_amount, epoch, shares, nav_per_share |
+| `WithdrawalRequested`, `WithdrawalCancelled`, `WithdrawalResolved` | withdrawal flow | vault, authority, shares, pending_shares, epoch, amount, nav_per_share |
+| `StrategyInitialized`, `StrategyClosed` | strategy lifecycle | vault, strategy, id, strategy_type |
+| `JupiterSwapExecuted`, `JupiterSwapExited` | Jupiter strategy | vault, strategy, source/destination mint, amount |
+| `MeteoraDlmmExecuted`, `MeteoraDlmmExited` | DLMM strategy | vault, strategy, position, amount_x/amount_y or bps_to_remove |
