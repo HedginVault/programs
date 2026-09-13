@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    config_seeds, manager_seeds,
+    config_seeds,
+    events::ManagerRemoved,
+    manager_seeds,
     seeds::{CONFIG, MANAGER},
     Config, Manager,
 };
@@ -42,6 +44,10 @@ impl<'info> RemoveManager<'info> {
         let manager_seeds = manager_seeds!(manager_authority, manager_bump);
 
         Manager::validate_address(manager_seeds, manager_key)?;
+
+        emit!(ManagerRemoved {
+            authority: manager_authority,
+        });
 
         Ok(())
     }

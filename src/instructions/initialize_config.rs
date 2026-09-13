@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    error::HedgeVaultError, seeds::CONFIG, validate, Config, NewConfigArgs, MAX_BPS,
+    error::HedgeVaultError, events::ConfigInitialized, seeds::CONFIG, validate, Config,
+    NewConfigArgs, MAX_BPS,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -65,6 +66,13 @@ impl<'info> InitializeConfig<'info> {
             max_nav_deviation_bps: args.max_nav_deviation_bps,
             max_epoch_outflow_bps: args.max_epoch_outflow_bps,
             bump: ctx.bumps.config,
+        });
+
+        emit!(ConfigInitialized {
+            admin: config.admin,
+            nav_updater: config.nav_updater,
+            treasury_authority: config.treasury_authority,
+            guardian: config.guardian,
         });
 
         Ok(())

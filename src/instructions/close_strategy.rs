@@ -5,8 +5,8 @@ use anchor_spl::{
 };
 
 use crate::{
-    dlmm, error::HedgeVaultError, seeds::VAULT, validate, vault_seeds, Strategy, StrategyType,
-    Vault,
+    dlmm, error::HedgeVaultError, events::StrategyClosed, seeds::VAULT, validate, vault_seeds,
+    Strategy, StrategyType, Vault,
 };
 
 #[derive(Accounts)]
@@ -43,6 +43,11 @@ impl<'info> CloseStrategy<'info> {
         vault.validate_authority(authority.key())?;
 
         drop(vault);
+
+        emit!(StrategyClosed {
+            vault: vault_key,
+            strategy: strategy.key(),
+        });
 
         match strategy.strategy_type {
             StrategyType::MeteoraDlmm { position } => {

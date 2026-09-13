@@ -4,7 +4,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 
 use crate::{
     error::HedgeVaultError, validate, validate_pda, SafeConvert, SafeMath, SafeMathAssign,
-    EPOCH_DURATION, MAX_BPS, NAV_PRECISION, SECONDS_PER_YEAR,
+    EPOCH_DURATION, MAX_BPS, NAV_PRECISION, SECONDS_PER_YEAR, VAULT_VERSION,
 };
 
 pub struct NewVaultArgs {
@@ -19,6 +19,11 @@ pub struct NewVaultArgs {
     pub management_fee_bps: u16,
     pub current_ts: i64,
     pub bump: u8,
+}
+
+pub struct NavUpdate {
+    pub manager_fee_shares: u64,
+    pub platform_fee_shares: u64,
 }
 
 pub struct UpdateNavArgs {
@@ -101,7 +106,8 @@ pub struct Vault {
     /// Next strategy ID, increments with each new strategy.
     pub next_strategy_id: u8,
     pub bump: u8,
-    padding0: [u8; 1],
+    /// Layout version, see [VAULT_VERSION].
+    pub version: u8,
     padding1: [u64; 15],
 }
 
@@ -130,7 +136,7 @@ impl Vault {
             status: VaultStatus::Normal,
             next_strategy_id: 0,
             bump: args.bump,
-            padding0: [0; 1],
+            version: VAULT_VERSION,
             padding1: [0; 15],
         }
     }
@@ -195,7 +201,7 @@ impl Vault {
     // NAV
 
     /// Settles fees as share dilution and records the new NAV. Callable once per epoch.
-    pub fn update_nav(&mut self, args: UpdateNavArgs) -> Result<()> {
+    pub fn update_nav(&mut self, args: UpdateNavArgs) -> Result<NavUpdate> {
         let UpdateNavArgs {
             total_assets,
             share_supply,
@@ -215,6 +221,11 @@ impl Vault {
         let supply = share_supply
             .safe_add(self.unclaimed_manager_fee_shares)?
             .safe_add(self.unclaimed_platform_fee_shares)? as u128;
+
+        let mut nav_update = NavUpdate {
+            manager_fee_shares: 0,
+            platform_fee_shares: 0,
+        };
 
         if supply == 0 {
             self.nav_per_share = NAV_PRECISION;
@@ -281,10 +292,13 @@ impl Vault {
                 self.validate_nav_deviation(nav_per_share, max_nav_deviation_bps)?;
             }
 
+            nav_update.manager_fee_shares = manager_fee_shares.safe_to_u64()?;
+            nav_update.platform_fee_shares = platform_fee_shares.safe_to_u64()?;
+
             self.unclaimed_manager_fee_shares
-                .safe_add_assign(manager_fee_shares.safe_to_u64()?)?;
+                .safe_add_assign(nav_update.manager_fee_shares)?;
             self.unclaimed_platform_fee_shares
-                .safe_add_assign(platform_fee_shares.safe_to_u64()?)?;
+                .safe_add_assign(nav_update.platform_fee_shares)?;
             self.nav_per_share = nav_per_share;
 
             if nav_per_share > self.high_water_mark {
@@ -297,7 +311,7 @@ impl Vault {
         self.last_nav_ts = now;
         self.epoch_outflow = 0;
 
-        Ok(())
+        Ok(nav_update)
     }
 
     fn validate_nav_deviation(&self, nav_per_share: u64, max_nav_deviation_bps: u16) -> Result<()> {

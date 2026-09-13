@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use bytemuck::{Pod, Zeroable};
 use num_derive::{FromPrimitive, ToPrimitive};
 
-use crate::{error::HedgeVaultError, validate, validate_pda, SafeMathAssign};
+use crate::{error::HedgeVaultError, validate, validate_pda, SafeMathAssign, CONFIG_VERSION};
 
 #[derive(
     AnchorSerialize,
@@ -61,6 +61,10 @@ pub struct Config {
     pub status: ProtocolStatus,
     pub bump: u8,
     padding0: [u8; 6],
+    /// Layout version, see [CONFIG_VERSION].
+    pub version: u8,
+    padding1: [u8; 7],
+    reserve: [u64; 23],
 }
 
 impl Config {
@@ -78,6 +82,9 @@ impl Config {
             status: ProtocolStatus::Paused,
             bump: args.bump,
             padding0: [0; 6],
+            version: CONFIG_VERSION,
+            padding1: [0; 7],
+            reserve: [0; 23],
         }
     }
 
@@ -117,6 +124,10 @@ impl Config {
 
     pub fn pause(&mut self) {
         self.status = ProtocolStatus::Paused;
+    }
+
+    pub fn migrate(&mut self) {
+        self.version = CONFIG_VERSION;
     }
 
     pub fn increment_vault_id(&mut self) -> Result<()> {

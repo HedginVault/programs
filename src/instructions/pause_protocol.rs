@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{config_seeds, seeds::CONFIG, Config};
+use crate::{config_seeds, events::ProtocolPaused, seeds::CONFIG, Config};
 
 #[derive(Accounts)]
 pub struct PauseProtocol<'info> {
@@ -24,6 +24,10 @@ impl<'info> PauseProtocol<'info> {
         config.validate_guardian(guardian.key())?;
 
         config.pause();
+
+        emit!(ProtocolPaused {
+            guardian: guardian.key(),
+        });
 
         Ok(())
     }

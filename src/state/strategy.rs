@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use core::mem::size_of;
 
-use crate::{error::HedgeVaultError, validate_pda};
+use crate::{error::HedgeVaultError, validate_pda, STRATEGY_VERSION};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq)]
 pub enum StrategyType {
@@ -40,7 +40,9 @@ pub struct Strategy {
     /// ID unique to the strategy within the vault.
     pub id: u8,
     pub bump: u8,
-    padding0: [u8; 6],
+    /// Layout version, see [STRATEGY_VERSION].
+    pub version: u8,
+    padding0: [u8; 5],
     /// Details about the underlying protocol and action of the strategy.
     pub strategy_type: StrategyType,
 }
@@ -53,7 +55,8 @@ impl Strategy {
             last_action_ts: args.created_ts,
             id: args.id,
             bump: args.bump,
-            padding0: [0; 6],
+            version: STRATEGY_VERSION,
+            padding0: [0; 5],
             strategy_type: args.strategy_type,
         }
     }
@@ -73,5 +76,6 @@ impl Space for Strategy {
         + size_of::<i64>()
         + size_of::<u8>()
         + size_of::<u8>()
-        + size_of::<u8>() * 6;
+        + size_of::<u8>()
+        + size_of::<u8>() * 5;
 }

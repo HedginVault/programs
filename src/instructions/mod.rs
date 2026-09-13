@@ -43,6 +43,9 @@ pub use initialize_strategy_meteora_dlmm::*;
 pub mod initialize_vault;
 pub use initialize_vault::*;
 
+pub mod migrate_config;
+pub use migrate_config::*;
+
 pub mod override_nav;
 pub use override_nav::*;
 

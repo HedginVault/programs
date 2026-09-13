@@ -7,6 +7,7 @@ use anchor_spl::{
 
 use crate::{
     error::HedgeVaultError,
+    events::VaultClosed,
     seeds::{DEPOSIT_ESCROW, SHARE_ESCROW, VAULT},
     validate, vault_seeds, Vault,
 };
@@ -117,6 +118,8 @@ impl<'info> CloseVault<'info> {
                 .with_signer(&[vault_seeds]),
             )?;
         }
+
+        emit!(VaultClosed { vault: vault_key });
 
         Ok(())
     }

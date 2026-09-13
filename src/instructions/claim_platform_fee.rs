@@ -8,6 +8,7 @@ use anchor_spl::{
 
 use crate::{
     config_seeds,
+    events::PlatformFeeClaimed,
     seeds::{CONFIG, VAULT},
     vault_seeds, Config, Vault,
 };
@@ -80,6 +81,12 @@ impl<'info> ClaimPlatformFee<'info> {
             .with_signer(&[vault_seeds]),
             shares,
         )?;
+
+        emit!(PlatformFeeClaimed {
+            vault: vault_key,
+            authority: treasury_authority.key(),
+            shares,
+        });
 
         Ok(())
     }

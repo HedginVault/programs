@@ -7,6 +7,7 @@ use anchor_spl::{
 
 use crate::{
     config_seeds, deposit_request_seeds,
+    events::DepositResolved,
     seeds::{CONFIG, DEPOSIT_ESCROW, DEPOSIT_REQUEST, VAULT},
     vault_seeds, Config, DepositRequest, Vault,
 };
@@ -136,6 +137,14 @@ impl<'info> ResolveDepositRequest<'info> {
                 shares,
             )?;
         }
+
+        emit!(DepositResolved {
+            vault: vault_key,
+            authority: depositor_key,
+            amount,
+            shares,
+            nav_per_share: vault.nav_per_share,
+        });
 
         Ok(())
     }

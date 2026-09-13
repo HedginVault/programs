@@ -16,6 +16,7 @@ use crate::{
         types::RemainingAccountsInfo,
     },
     error::HedgeVaultError,
+    events::MeteoraDlmmExited,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
 };
@@ -226,6 +227,13 @@ impl<'info> ExitStrategyMeteoraDlmm<'info> {
             upper_bin_id,
             remaining_accounts_info,
         )?;
+
+        emit!(MeteoraDlmmExited {
+            vault: vault_key,
+            strategy: strategy_key,
+            position: position_key,
+            bps_to_remove,
+        });
 
         Ok(())
     }

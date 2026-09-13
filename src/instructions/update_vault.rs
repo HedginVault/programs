@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    error::HedgeVaultError, seeds::VAULT, validate, vault_seeds, Vault, VaultStatus, MAX_BPS,
+    error::HedgeVaultError, events::VaultUpdated, seeds::VAULT, validate, vault_seeds, Vault,
+    VaultStatus, MAX_BPS,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -65,6 +66,14 @@ impl<'info> UpdateVault<'info> {
         if let Some(status) = args.status {
             vault.status = status;
         }
+
+        emit!(VaultUpdated {
+            vault: vault_key,
+            performance_fee_bps: vault.performance_fee_bps,
+            management_fee_bps: vault.management_fee_bps,
+            deposit_cap: vault.deposit_cap,
+            status: vault.status,
+        });
 
         Ok(())
     }

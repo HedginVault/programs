@@ -8,6 +8,7 @@ use anchor_spl::{
 use crate::{
     config_seeds,
     error::HedgeVaultError,
+    events::VaultInitialized,
     manager_seeds,
     seeds::{CONFIG, DEPOSIT_ESCROW, MANAGER, SHARE_ESCROW, SHARE_MINT, VAULT},
     validate, Config, Manager, NewVaultArgs, Vault, MAX_BPS,
@@ -122,6 +123,7 @@ impl<'info> InitializeVault<'info> {
             HedgeVaultError::InvalidBasisPoints
         )?;
 
+        let vault_key = vault.key();
         let mut vault = vault.load_init()?;
 
         let now = Clock::get()?.unix_timestamp;
@@ -141,6 +143,14 @@ impl<'info> InitializeVault<'info> {
         });
 
         config.increment_vault_id()?;
+
+        emit!(VaultInitialized {
+            vault: vault_key,
+            id: vault.id,
+            authority: vault.authority,
+            deposit_mint: vault.deposit_mint,
+            share_mint: vault.share_mint,
+        });
 
         Ok(())
     }

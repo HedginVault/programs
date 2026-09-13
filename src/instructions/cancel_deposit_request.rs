@@ -6,6 +6,7 @@ use anchor_spl::{
 
 use crate::{
     deposit_request_seeds,
+    events::DepositCancelled,
     seeds::{DEPOSIT_ESCROW, DEPOSIT_REQUEST, VAULT},
     vault_seeds, DepositRequest, Vault,
 };
@@ -93,6 +94,12 @@ impl<'info> CancelDepositRequest<'info> {
             amount,
             deposit_mint.decimals,
         )?;
+
+        emit!(DepositCancelled {
+            vault: vault_key,
+            authority: depositor_key,
+            amount,
+        });
 
         Ok(())
     }

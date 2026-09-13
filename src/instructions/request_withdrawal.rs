@@ -9,6 +9,7 @@ use anchor_spl::{
 use crate::{
     config_seeds,
     error::HedgeVaultError,
+    events::WithdrawalRequested,
     seeds::{CONFIG, SHARE_ESCROW, VAULT, WITHDRAWAL_REQUEST},
     validate, vault_seeds, withdrawal_request_seeds, Config, NewWithdrawalRequestArgs, Vault,
     WithdrawalRequest,
@@ -136,6 +137,14 @@ impl<'info> RequestWithdrawal<'info> {
             shares,
             share_mint.decimals,
         )?;
+
+        emit!(WithdrawalRequested {
+            vault: vault_key,
+            authority: withdrawer_key,
+            shares,
+            pending_shares: withdrawal_request.shares,
+            epoch: withdrawal_request.epoch,
+        });
 
         Ok(())
     }

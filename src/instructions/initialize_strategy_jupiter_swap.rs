@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::Mint;
 
 use crate::{
+    events::StrategyInitialized,
     seeds::{STRATEGY, VAULT},
     vault_seeds, NewStrategyArgs, Strategy, StrategyType, Vault,
 };
@@ -59,6 +60,13 @@ impl<'info> InitializeStrategyJupiterSwap<'info> {
         }));
 
         vault.increment_strategy_id()?;
+
+        emit!(StrategyInitialized {
+            vault: vault_key,
+            strategy: strategy.key(),
+            id: strategy.id,
+            strategy_type: strategy.strategy_type,
+        });
 
         Ok(())
     }

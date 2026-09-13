@@ -5,6 +5,7 @@ use crate::{
         cpi::{accounts::InitializePosition2, initialize_position2},
         ID as dlmm_ID,
     },
+    events::StrategyInitialized,
     seeds::{STRATEGY, VAULT},
     vault_seeds, NewStrategyArgs, Strategy, StrategyType, Vault,
 };
@@ -81,6 +82,13 @@ impl<'info> InitializeStrategyMeteoraDlmm<'info> {
 
         vault.increment_strategy_id()?;
         drop(vault);
+
+        emit!(StrategyInitialized {
+            vault: vault_key,
+            strategy: strategy.key(),
+            id: strategy.id,
+            strategy_type: strategy.strategy_type,
+        });
 
         // vault is the owner of the position
         let width = upper_bin_id - lower_bin_id;
