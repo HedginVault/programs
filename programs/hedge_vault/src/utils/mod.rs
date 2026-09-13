@@ -6,5 +6,8 @@ pub mod seeds;
 pub mod system;
 pub use system::*;
 
+pub mod token;
+pub use token::*;
+
 pub mod validate;
 pub use validate::*;

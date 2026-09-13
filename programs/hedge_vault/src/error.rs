@@ -75,6 +75,8 @@ pub enum HedgeVaultError {
     InvalidSharesAmount,
     #[msg("Unclaimed fee shares is 0")]
     NoFeeToClaim,
+    #[msg("Deposit mint has a Token-2022 extension the vault does not support")]
+    InvalidDepositMintExtension,
 
     // NAV
     #[msg("NAV has already been updated for the current epoch")]
