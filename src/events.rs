@@ -154,7 +154,7 @@ pub struct WithdrawalResolved {
 pub struct StrategyInitialized {
     pub vault: Pubkey,
     pub strategy: Pubkey,
-    pub id: u8,
+    pub id: u32,
     pub strategy_type: StrategyType,
 }
 
