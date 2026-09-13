@@ -8,6 +8,7 @@ use anchor_spl::{
 use crate::{
     config_seeds,
     error::HedgeVaultError,
+    events::WithdrawalResolved,
     seeds::{CONFIG, SHARE_ESCROW, VAULT, WITHDRAWAL_REQUEST},
     validate, vault_seeds, withdrawal_request_seeds, Config, Vault, WithdrawalRequest,
 };
@@ -143,6 +144,14 @@ impl<'info> ResolveWithdrawalRequest<'info> {
                 deposit_mint.decimals,
             )?;
         }
+
+        emit!(WithdrawalResolved {
+            vault: vault_key,
+            authority: withdrawer_key,
+            shares,
+            amount,
+            nav_per_share: vault.nav_per_share,
+        });
 
         Ok(())
     }

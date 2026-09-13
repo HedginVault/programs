@@ -7,6 +7,7 @@ use anchor_spl::{
 use crate::{
     config_seeds,
     error::HedgeVaultError,
+    events::JupiterSwapExecuted,
     jupiter,
     protocol::jupiter::{JupiterSwap, JUPITER_AGGREGATOR_EVENT_AUTHORITY},
     seeds::{CONFIG, STRATEGY, VAULT},
@@ -126,6 +127,14 @@ impl<'info> ExecuteStrategyJupiterSwap<'info> {
         };
 
         jupiter_swap.swap(&swap_data, ctx.remaining_accounts, vault_seeds)?;
+
+        emit!(JupiterSwapExecuted {
+            vault: vault_key,
+            strategy: strategy_key,
+            source_mint: source_mint.key(),
+            destination_mint: destination_mint.key(),
+            amount,
+        });
 
         Ok(())
     }

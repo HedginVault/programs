@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     config_seeds,
+    events::ManagerAdded,
     seeds::{CONFIG, MANAGER},
     Config, Manager, NewManagerArgs,
 };
@@ -46,6 +47,10 @@ impl<'info> AddManager<'info> {
             authority: authority.key(),
             bump: ctx.bumps.manager,
         }));
+
+        emit!(ManagerAdded {
+            authority: authority.key(),
+        });
 
         Ok(())
     }

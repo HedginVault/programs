@@ -6,6 +6,7 @@ use anchor_spl::{
 };
 
 use crate::{
+    events::WithdrawalCancelled,
     seeds::{SHARE_ESCROW, VAULT, WITHDRAWAL_REQUEST},
     vault_seeds, withdrawal_request_seeds, Vault, WithdrawalRequest,
 };
@@ -93,6 +94,12 @@ impl<'info> CancelWithdrawalRequest<'info> {
             shares,
             share_mint.decimals,
         )?;
+
+        emit!(WithdrawalCancelled {
+            vault: vault_key,
+            authority: withdrawer_key,
+            shares,
+        });
 
         Ok(())
     }

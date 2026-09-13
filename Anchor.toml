@@ -21,6 +21,7 @@ wallet = "~/.config/solana/idm.json"
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 initialize-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/initialize_config.ts"
+migrate-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/migrate_config.ts"
 update-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/update_config.ts"
 add-manager = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/add_manager.ts"
 remove-manager = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/remove_manager.ts"

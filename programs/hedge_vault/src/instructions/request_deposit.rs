@@ -9,6 +9,7 @@ use anchor_spl::{
 use crate::{
     config_seeds, deposit_request_seeds,
     error::HedgeVaultError,
+    events::DepositRequested,
     seeds::{CONFIG, DEPOSIT_ESCROW, DEPOSIT_REQUEST, VAULT},
     validate, vault_seeds, Config, DepositRequest, NewDepositRequestArgs, Vault,
 };
@@ -132,6 +133,14 @@ impl<'info> RequestDeposit<'info> {
             amount,
             deposit_mint.decimals,
         )?;
+
+        emit!(DepositRequested {
+            vault: vault_key,
+            authority: depositor_key,
+            amount,
+            pending_amount: deposit_request.amount,
+            epoch: deposit_request.epoch,
+        });
 
         Ok(())
     }

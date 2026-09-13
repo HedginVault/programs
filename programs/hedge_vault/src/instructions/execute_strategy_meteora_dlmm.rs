@@ -12,6 +12,7 @@ use crate::{
         types::{LiquidityParameterByStrategy, RemainingAccountsInfo},
     },
     error::HedgeVaultError,
+    events::MeteoraDlmmExecuted,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
 };
@@ -147,7 +148,8 @@ impl<'info> ExecuteStrategyMeteoraDlmm<'info> {
         strategy.record_action(now);
         drop(vault);
 
-        // token X and Y are deployed directly from vault token accounts, rebalancing is done via Jupiter swap beforehand
+        let (amount_x, amount_y) = (liquidity_parameter.amount_x, liquidity_parameter.amount_y);
+
         add_liquidity_by_strategy2(
             CpiContext::new(
                 dlmm_program.to_account_info(),
@@ -175,6 +177,14 @@ impl<'info> ExecuteStrategyMeteoraDlmm<'info> {
             liquidity_parameter,
             remaining_accounts_info,
         )?;
+
+        emit!(MeteoraDlmmExecuted {
+            vault: vault_key,
+            strategy: strategy_key,
+            position: position_key,
+            amount_x,
+            amount_y,
+        });
 
         Ok(())
     }

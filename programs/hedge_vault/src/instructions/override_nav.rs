@@ -4,6 +4,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use crate::{
     config_seeds,
     error::HedgeVaultError,
+    events::NavUpdated,
     seeds::{CONFIG, VAULT},
     validate, vault_seeds, Config, UpdateNavArgs, Vault,
 };
@@ -64,7 +65,7 @@ impl<'info> OverrideNav<'info> {
 
         let now = Clock::get()?.unix_timestamp;
 
-        vault.update_nav(UpdateNavArgs {
+        let nav_update = vault.update_nav(UpdateNavArgs {
             total_assets,
             share_supply: share_mint.supply,
             platform_performance_fee_bps: config.platform_performance_fee_bps,
@@ -72,6 +73,17 @@ impl<'info> OverrideNav<'info> {
             max_nav_deviation_bps: None,
             now,
         })?;
+
+        emit!(NavUpdated {
+            vault: vault_key,
+            epoch: vault.nav_epoch,
+            total_assets: vault.total_assets,
+            nav_per_share: vault.nav_per_share,
+            high_water_mark: vault.high_water_mark,
+            manager_fee_shares: nav_update.manager_fee_shares,
+            platform_fee_shares: nav_update.platform_fee_shares,
+            overridden: true,
+        });
 
         Ok(())
     }

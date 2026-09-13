@@ -1,5 +1,6 @@
 pub mod constants;
 pub mod error;
+pub mod events;
 pub mod instructions;
 pub mod protocol;
 pub mod state;
@@ -43,6 +44,10 @@ pub mod hedge_vault {
 
     pub fn claim_platform_fee(ctx: Context<ClaimPlatformFee>) -> Result<()> {
         ClaimPlatformFee::handler(ctx)
+    }
+
+    pub fn migrate_config(ctx: Context<MigrateConfig>) -> Result<()> {
+        MigrateConfig::handler(ctx)
     }
 
     pub fn override_nav(ctx: Context<OverrideNav>, total_assets: u64) -> Result<()> {

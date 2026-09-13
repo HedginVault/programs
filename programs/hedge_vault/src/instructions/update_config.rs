@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    config_seeds, error::HedgeVaultError, seeds::CONFIG, validate, Config, ProtocolStatus,
-    MAX_BPS,
+    config_seeds, error::HedgeVaultError, events::ConfigUpdated, seeds::CONFIG, validate,
+    Config, ProtocolStatus, MAX_BPS,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -106,6 +106,18 @@ impl<'info> UpdateConfig<'info> {
         if let Some(status) = args.status {
             config.status = status;
         }
+
+        emit!(ConfigUpdated {
+            admin: config.admin,
+            nav_updater: config.nav_updater,
+            treasury_authority: config.treasury_authority,
+            guardian: config.guardian,
+            platform_performance_fee_bps: config.platform_performance_fee_bps,
+            platform_management_fee_bps: config.platform_management_fee_bps,
+            max_nav_deviation_bps: config.max_nav_deviation_bps,
+            max_epoch_outflow_bps: config.max_epoch_outflow_bps,
+            status: config.status,
+        });
 
         Ok(())
     }

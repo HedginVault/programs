@@ -29,6 +29,8 @@ pub enum HedgeVaultError {
     // Config
     #[msg("Config address does not match")]
     InvalidConfig,
+    #[msg("Config layout is not the expected version for this migration")]
+    InvalidConfigVersion,
     #[msg("Admin does not match")]
     InvalidAdmin,
     #[msg("NAV updater does not match")]

@@ -6,7 +6,7 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount},
 };
 
-use crate::{seeds::VAULT, vault_seeds, Vault};
+use crate::{events::ManagerFeeClaimed, seeds::VAULT, vault_seeds, Vault};
 
 #[derive(Accounts)]
 pub struct ClaimManagerFee<'info> {
@@ -67,6 +67,12 @@ impl<'info> ClaimManagerFee<'info> {
             .with_signer(&[vault_seeds]),
             shares,
         )?;
+
+        emit!(ManagerFeeClaimed {
+            vault: vault_key,
+            authority: authority.key(),
+            shares,
+        });
 
         Ok(())
     }
