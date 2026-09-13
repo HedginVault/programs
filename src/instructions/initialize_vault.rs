@@ -11,7 +11,7 @@ use crate::{
     events::VaultInitialized,
     manager_seeds,
     seeds::{CONFIG, DEPOSIT_ESCROW, MANAGER, SHARE_ESCROW, SHARE_MINT, VAULT},
-    validate, Config, Manager, NewVaultArgs, Vault, MAX_BPS,
+    validate, validate_deposit_mint_extensions, Config, Manager, NewVaultArgs, Vault, MAX_BPS,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -123,10 +123,11 @@ impl<'info> InitializeVault<'info> {
             HedgeVaultError::InvalidBasisPoints
         )?;
 
+        let clock = Clock::get()?;
+        validate_deposit_mint_extensions(&deposit_mint.to_account_info(), clock.epoch)?;
+
         let vault_key = vault.key();
         let mut vault = vault.load_init()?;
-
-        let now = Clock::get()?.unix_timestamp;
 
         *vault = Vault::new(NewVaultArgs {
             id: config.next_vault_id,
@@ -138,7 +139,7 @@ impl<'info> InitializeVault<'info> {
             deposit_cap: args.deposit_cap,
             performance_fee_bps: args.performance_fee_bps,
             management_fee_bps: args.management_fee_bps,
-            current_ts: now,
+            current_ts: clock.unix_timestamp,
             bump: ctx.bumps.vault,
         });
 

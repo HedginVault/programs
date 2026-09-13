@@ -11,7 +11,8 @@ use crate::{
     error::HedgeVaultError,
     events::DepositRequested,
     seeds::{CONFIG, DEPOSIT_ESCROW, DEPOSIT_REQUEST, VAULT},
-    validate, vault_seeds, Config, DepositRequest, NewDepositRequestArgs, Vault,
+    validate, validate_deposit_mint_extensions, vault_seeds, Config, DepositRequest,
+    NewDepositRequestArgs, Vault,
 };
 
 #[derive(Accounts)]
@@ -95,7 +96,10 @@ impl<'info> RequestDeposit<'info> {
         vault.validate_deposit_mint(deposit_mint.key())?;
         vault.validate_share_mint(share_mint.key())?;
 
-        let now = Clock::get()?.unix_timestamp;
+        // the issuer can enable a transfer fee after the vault is created
+        let clock = Clock::get()?;
+        validate_deposit_mint_extensions(&deposit_mint.to_account_info(), clock.epoch)?;
+        let now = clock.unix_timestamp;
         let epoch = Vault::epoch(now);
         let depositor_key = depositor.key();
 
