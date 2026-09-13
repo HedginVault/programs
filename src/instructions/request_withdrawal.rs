@@ -121,7 +121,7 @@ impl<'info> RequestWithdrawal<'info> {
         }
 
         withdrawal_request.add(shares, epoch)?;
-        vault.request_withdrawal(shares)?;
+        vault.request_withdrawal(shares, withdrawer_share_token_account.amount)?;
 
         transfer_checked(
             CpiContext::new(

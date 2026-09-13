@@ -79,6 +79,10 @@ pub enum HedgeVaultError {
     InvalidDepositMintExtension,
     #[msg("Vault NAV is zero, deposits are closed until NAV is restored")]
     VaultNavIsZero,
+    #[msg("Deposit is below the vault minimum")]
+    DepositBelowMinimum,
+    #[msg("Withdrawal is below the vault minimum and is not the full share balance")]
+    WithdrawalBelowMinimum,
 
     // NAV
     #[msg("NAV has already been updated for the current epoch")]

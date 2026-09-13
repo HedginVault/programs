@@ -62,6 +62,8 @@ pub struct VaultUpdated {
     pub performance_fee_bps: u16,
     pub management_fee_bps: u16,
     pub deposit_cap: u64,
+    pub min_deposit: u64,
+    pub min_withdrawal_shares: u64,
     pub status: VaultStatus,
 }
 
