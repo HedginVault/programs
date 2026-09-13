@@ -582,4 +582,58 @@ impl TestContext {
         );
         self.send(&[claim], &[])
     }
+
+    // Admin reject
+
+    /// `signer` defaults to the admin.
+    pub fn reject_deposit_request(
+        &mut self,
+        v: &TestVault,
+        depositor: &Pubkey,
+        signer: Option<&Keypair>,
+    ) -> TransactionResult {
+        let reject = ix(
+            accounts::RejectDepositRequest {
+                admin: signer.map_or(self.admin.pubkey(), |s| s.pubkey()),
+                config: config_pda(),
+                vault: v.address,
+                depositor: *depositor,
+                deposit_request: deposit_request_pda(&v.address, depositor),
+                deposit_mint: v.deposit_mint,
+                depositor_token_account: ata(depositor, &v.deposit_mint, &v.deposit_token_program),
+                deposit_escrow: deposit_escrow_pda(&v.address),
+                deposit_mint_token_program: v.deposit_token_program,
+                system_program: system_program::ID,
+            },
+            instruction::RejectDepositRequest {},
+        );
+        let signers: Vec<&Keypair> = signer.into_iter().collect();
+        self.send(&[reject], &signers)
+    }
+
+    /// `signer` defaults to the admin.
+    pub fn reject_withdrawal_request(
+        &mut self,
+        v: &TestVault,
+        withdrawer: &Pubkey,
+        signer: Option<&Keypair>,
+    ) -> TransactionResult {
+        let reject = ix(
+            accounts::RejectWithdrawalRequest {
+                admin: signer.map_or(self.admin.pubkey(), |s| s.pubkey()),
+                config: config_pda(),
+                vault: v.address,
+                withdrawer: *withdrawer,
+                withdrawal_request: withdrawal_request_pda(&v.address, withdrawer),
+                share_mint: v.share_mint,
+                withdrawer_share_token_account: ata(withdrawer, &v.share_mint, &TOKEN_PROGRAM),
+                share_escrow: share_escrow_pda(&v.address),
+                share_token_program: TOKEN_PROGRAM,
+                system_program: system_program::ID,
+            },
+            instruction::RejectWithdrawalRequest {},
+        );
+        let signers: Vec<&Keypair> = signer.into_iter().collect();
+        self.send(&[reject], &signers)
+    }
 }

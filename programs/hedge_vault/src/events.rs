@@ -141,6 +141,13 @@ pub struct DepositResolved {
 }
 
 #[event]
+pub struct DepositRejected {
+    pub vault: Pubkey,
+    pub authority: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
 pub struct WithdrawalRequested {
     pub vault: Pubkey,
     pub authority: Pubkey,
@@ -163,6 +170,13 @@ pub struct WithdrawalResolved {
     pub shares: u64,
     pub amount: u64,
     pub nav_per_share: u64,
+}
+
+#[event]
+pub struct WithdrawalRejected {
+    pub vault: Pubkey,
+    pub authority: Pubkey,
+    pub shares: u64,
 }
 
 // Strategies
