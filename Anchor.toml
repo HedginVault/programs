@@ -1,0 +1,47 @@
+[toolchain]
+package_manager = "yarn"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+hedge_vault = "r2ahBQ6gbPCJ9FxBymYcXuwXi8NmenRry7SE7QR7FAt"
+
+[programs.mainnet]
+hedge_vault = "r2ahBQ6gbPCJ9FxBymYcXuwXi8NmenRry7SE7QR7FAt"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "mainnet"
+wallet = "~/.config/solana/idm.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+initialize-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/initialize_config.ts"
+update-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/update_config.ts"
+add-manager = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/add_manager.ts"
+remove-manager = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/remove_manager.ts"
+pause-protocol = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/pause_protocol.ts"
+initialize-vault = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/initialize_vault.ts"
+update-vault = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/update_vault.ts"
+close-vault = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/close_vault.ts"
+update-nav = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/update_nav.ts"
+override-nav = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/override_nav.ts"
+claim-manager-fee = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/claim_manager_fee.ts"
+claim-platform-fee = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/claim_platform_fee.ts"
+request-deposit = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/request_deposit.ts"
+cancel-deposit-request = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/cancel_deposit_request.ts"
+resolve-deposit-request = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/resolve_deposit_request.ts"
+request-withdrawal = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/request_withdrawal.ts"
+cancel-withdrawal-request = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/cancel_withdrawal_request.ts"
+resolve-withdrawal-request = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/resolve_withdrawal_request.ts"
+initialize-strategy-jupiter-swap = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/initialize_strategy_jupiter_swap.ts"
+execute-strategy-jupiter-swap = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/execute_strategy_jupiter_swap.ts"
+exit-strategy-jupiter-swap = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/exit_strategy_jupiter_swap.ts"
+initialize-strategy-meteora-dlmm = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/initialize_strategy_meteora_dlmm.ts"
+execute-strategy-meteora-dlmm = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/execute_strategy_meteora_dlmm.ts"
+exit-strategy-meteora-dlmm = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/exit_strategy_meteora_dlmm.ts"
+close-strategy = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/close_strategy.ts"
