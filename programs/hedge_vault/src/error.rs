@@ -39,6 +39,8 @@ pub enum HedgeVaultError {
     InvalidTreasuryAuthority,
     #[msg("Guardian does not match")]
     InvalidGuardian,
+    #[msg("Signer is not the pending admin")]
+    InvalidPendingAdmin,
     #[msg("Protocol is paused or in reduce-only status")]
     ProtocolNotOperational,
     #[msg("Protocol is not in a withdrawable status")]

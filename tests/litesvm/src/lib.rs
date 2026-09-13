@@ -282,7 +282,7 @@ impl TestContext {
 
     pub fn update_config_args() -> UpdateConfigArgs {
         UpdateConfigArgs {
-            new_admin: None,
+            pending_admin: None,
             nav_updater: None,
             treasury_authority: None,
             guardian: None,
@@ -303,6 +303,17 @@ impl TestContext {
             instruction::UpdateConfig { args },
         );
         self.send(&[update], &[])
+    }
+
+    pub fn accept_admin(&mut self, signer: &Keypair) -> TransactionResult {
+        let accept = ix(
+            accounts::AcceptAdmin {
+                pending_admin: signer.pubkey(),
+                config: config_pda(),
+            },
+            instruction::AcceptAdmin {},
+        );
+        self.send(&[accept], &[signer])
     }
 
     // Vault

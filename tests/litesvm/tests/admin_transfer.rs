@@ -1,0 +1,28 @@
+use hedge_vault_litesvm::*;
+
+#[test]
+fn admin_transfer_requires_acceptance() {
+    let mut ctx = TestContext::new();
+    let old_admin = ctx.admin.pubkey();
+    let new_admin = ctx.new_user();
+
+    let mut args = TestContext::update_config_args();
+    args.pending_admin = Some(new_admin.pubkey());
+    ctx.update_config(args).unwrap();
+
+    assert_eq!(ctx.config().admin, old_admin);
+    assert_eq!(ctx.config().pending_admin, new_admin.pubkey());
+
+    let stranger = ctx.new_user();
+    assert_error(ctx.accept_admin(&stranger), HedgeVaultError::InvalidPendingAdmin);
+
+    ctx.accept_admin(&new_admin).unwrap();
+    assert_eq!(ctx.config().admin, new_admin.pubkey());
+    assert_eq!(ctx.config().pending_admin, Pubkey::default());
+
+    // the harness signs update_config with the old admin, which is no longer allowed
+    assert_error(
+        ctx.update_config(TestContext::update_config_args()),
+        HedgeVaultError::InvalidAdmin,
+    );
+}

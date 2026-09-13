@@ -1,3 +1,6 @@
+pub mod accept_admin;
+pub use accept_admin::*;
+
 pub mod add_manager;
 pub use add_manager::*;
 

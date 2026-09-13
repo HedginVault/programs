@@ -24,6 +24,7 @@ test-litesvm = "anchor build && cargo test --manifest-path tests/litesvm/Cargo.t
 initialize-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/initialize_config.ts"
 migrate-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/migrate_config.ts"
 update-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/update_config.ts"
+accept-admin = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/accept_admin.ts"
 add-manager = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/add_manager.ts"
 remove-manager = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/remove_manager.ts"
 pause-protocol = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/pause_protocol.ts"

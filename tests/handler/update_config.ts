@@ -4,7 +4,7 @@ import { log, program, run, wallet } from "./setup";
 describe("hedge_vault", () => {
   it("update_config", async () => {
     const args = {
-      newAdmin: null,
+      pendingAdmin: null,
       navUpdater: null,
       treasuryAuthority: null,
       guardian: null,
