@@ -29,3 +29,7 @@ pub const TREASURY_CLAIM_FEE_BPS: u16 = 1_000; // 10%
 /// Used to prorate annualized management fees.
 #[constant]
 pub const SECONDS_PER_YEAR: i64 = 31_536_000; // 365 days
+
+/// Delay before a manager fee increase takes effect, so depositors can exit first.
+#[constant]
+pub const FEE_INCREASE_DELAY: i64 = 604_800; // 7 days
