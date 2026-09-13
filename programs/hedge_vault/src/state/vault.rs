@@ -432,3 +432,150 @@ impl Vault {
         Ok(shares)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DAY: i64 = 86_400;
+    const USDC: u64 = 1_000_000;
+
+    fn new_vault(performance_fee_bps: u16, management_fee_bps: u16) -> Vault {
+        Vault::new(NewVaultArgs {
+            id: 0,
+            authority: Pubkey::default(),
+            name: [0; 32],
+            description: [0; 64],
+            deposit_mint: Pubkey::default(),
+            share_mint: Pubkey::default(),
+            deposit_cap: u64::MAX,
+            performance_fee_bps,
+            management_fee_bps,
+            current_ts: 0,
+            bump: 0,
+        })
+    }
+
+    fn nav_args(total_assets: u64, share_supply: u64, now: i64) -> UpdateNavArgs {
+        UpdateNavArgs {
+            total_assets,
+            share_supply,
+            platform_performance_fee_bps: 0,
+            platform_management_fee_bps: 0,
+            max_nav_deviation_bps: None,
+            now,
+        }
+    }
+
+    fn assert_err<T: core::fmt::Debug>(result: Result<T>, error: HedgeVaultError) {
+        assert_eq!(result.unwrap_err(), anchor_lang::error::Error::from(error));
+    }
+
+    #[test]
+    fn layout_size_is_stable() {
+        assert_eq!(core::mem::size_of::<Vault>(), 416);
+    }
+
+    #[test]
+    fn update_nav_with_no_supply_resets_nav() {
+        let mut v = new_vault(0, 0);
+        v.update_nav(nav_args(0, 0, DAY)).unwrap();
+
+        assert_eq!(v.nav_per_share, NAV_PRECISION);
+        assert_eq!(v.nav_epoch, 1);
+        assert_eq!(v.last_nav_ts, DAY);
+    }
+
+    #[test]
+    fn update_nav_is_limited_to_once_per_epoch() {
+        let mut v = new_vault(0, 0);
+        v.update_nav(nav_args(0, 0, DAY)).unwrap();
+
+        assert_err(
+            v.update_nav(nav_args(0, 0, DAY + 1)).map(|_| ()),
+            HedgeVaultError::NavAlreadyUpdatedThisEpoch,
+        );
+    }
+
+    #[test]
+    fn profit_above_high_water_mark_accrues_performance_fee() {
+        let mut v = new_vault(2_000, 0);
+        v.update_nav(nav_args(0, 0, DAY)).unwrap();
+
+        let update = v.update_nav(nav_args(110 * USDC, 100 * USDC, 2 * DAY)).unwrap();
+
+        // profit 10 USDC, 20% fee = 2 USDC, minted as 2 * 100 / 108 shares
+        assert_eq!(update.manager_fee_shares, 1_851_851);
+        assert_eq!(update.platform_fee_shares, 0);
+        assert_eq!(v.unclaimed_manager_fee_shares, 1_851_851);
+        assert_eq!(v.nav_per_share, 1_080_000_009);
+        assert_eq!(v.high_water_mark, 1_080_000_009);
+    }
+
+    #[test]
+    fn management_fee_prorates_over_a_year() {
+        let mut v = new_vault(0, 200);
+        v.update_nav(nav_args(0, 0, DAY)).unwrap();
+
+        let update = v
+            .update_nav(nav_args(100 * USDC, 100 * USDC, DAY + SECONDS_PER_YEAR))
+            .unwrap();
+
+        // 2% of 100 USDC = 2 USDC, minted as 2 * 100 / 98 shares
+        assert_eq!(update.manager_fee_shares, 2_040_816);
+        assert_eq!(v.nav_per_share, 980_000_003);
+        assert_eq!(v.high_water_mark, NAV_PRECISION);
+    }
+
+    #[test]
+    fn nav_deviation_bound_rejects_large_moves() {
+        let mut v = new_vault(0, 0);
+        v.update_nav(nav_args(0, 0, DAY)).unwrap();
+
+        let mut args = nav_args(120 * USDC, 100 * USDC, 2 * DAY);
+        args.max_nav_deviation_bps = Some(1_000);
+
+        assert_err(
+            v.update_nav(args).map(|_| ()),
+            HedgeVaultError::NavDeviationExceeded,
+        );
+    }
+
+    #[test]
+    fn request_deposit_enforces_cap() {
+        let mut v = new_vault(0, 0);
+        v.deposit_cap = 100 * USDC;
+
+        v.request_deposit(60 * USDC).unwrap();
+        assert_err(
+            v.request_deposit(50 * USDC),
+            HedgeVaultError::DepositCapReached,
+        );
+    }
+
+    #[test]
+    fn resolve_deposit_mints_at_current_nav() {
+        let mut v = new_vault(0, 0);
+        v.nav_per_share = 2 * NAV_PRECISION;
+        v.pending_deposits = 50 * USDC;
+
+        let shares = v.resolve_deposit(50 * USDC).unwrap();
+
+        assert_eq!(shares, 25 * USDC);
+        assert_eq!(v.pending_deposits, 0);
+        assert_eq!(v.total_assets, 50 * USDC);
+    }
+
+    #[test]
+    fn resolve_withdrawal_enforces_epoch_outflow_cap() {
+        let mut v = new_vault(0, 0);
+        v.total_assets = 100 * USDC;
+        v.pending_withdrawal_shares = 55 * USDC;
+
+        assert_eq!(v.resolve_withdrawal(30 * USDC, 5_000).unwrap(), 30 * USDC);
+        assert_err(
+            v.resolve_withdrawal(25 * USDC, 5_000),
+            HedgeVaultError::EpochOutflowCapReached,
+        );
+    }
+}
