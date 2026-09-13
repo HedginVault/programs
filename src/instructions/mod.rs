@@ -55,6 +55,12 @@ pub use override_nav::*;
 pub mod pause_protocol;
 pub use pause_protocol::*;
 
+pub mod reject_deposit_request;
+pub use reject_deposit_request::*;
+
+pub mod reject_withdrawal_request;
+pub use reject_withdrawal_request::*;
+
 pub mod remove_manager;
 pub use remove_manager::*;
 

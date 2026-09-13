@@ -54,6 +54,14 @@ pub mod hedge_vault {
         OverrideNav::handler(ctx, total_assets)
     }
 
+    pub fn reject_deposit_request(ctx: Context<RejectDepositRequest>) -> Result<()> {
+        RejectDepositRequest::handler(ctx)
+    }
+
+    pub fn reject_withdrawal_request(ctx: Context<RejectWithdrawalRequest>) -> Result<()> {
+        RejectWithdrawalRequest::handler(ctx)
+    }
+
     // Guardian
 
     pub fn pause_protocol(ctx: Context<PauseProtocol>) -> Result<()> {
