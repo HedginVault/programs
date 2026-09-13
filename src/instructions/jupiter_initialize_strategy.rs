@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct InitializeStrategyJupiterSwap<'info> {
+pub struct JupiterInitializeStrategy<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
@@ -25,9 +25,9 @@ pub struct InitializeStrategyJupiterSwap<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> InitializeStrategyJupiterSwap<'info> {
-    pub fn handler(ctx: Context<InitializeStrategyJupiterSwap>) -> Result<()> {
-        let InitializeStrategyJupiterSwap {
+impl<'info> JupiterInitializeStrategy<'info> {
+    pub fn handler(ctx: Context<JupiterInitializeStrategy>) -> Result<()> {
+        let JupiterInitializeStrategy {
             authority,
             vault,
             strategy,
@@ -44,7 +44,7 @@ impl<'info> InitializeStrategyJupiterSwap<'info> {
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.validate_authority(authority.key())?;
 
-        // no actions required, execute will create the vault ATA for destination_mint if needed
+        // no actions required, jupiter_swap will create the vault ATA for destination_mint if needed
 
         let now = Clock::get()?.unix_timestamp;
 

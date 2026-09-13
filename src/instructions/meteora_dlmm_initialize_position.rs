@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct InitializeStrategyMeteoraDlmm<'info> {
+pub struct MeteoraDlmmInitializePosition<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
@@ -38,13 +38,13 @@ pub struct InitializeStrategyMeteoraDlmm<'info> {
     pub dlmm_program: UncheckedAccount<'info>,
 }
 
-impl<'info> InitializeStrategyMeteoraDlmm<'info> {
+impl<'info> MeteoraDlmmInitializePosition<'info> {
     pub fn handler(
-        ctx: Context<InitializeStrategyMeteoraDlmm>,
+        ctx: Context<MeteoraDlmmInitializePosition>,
         lower_bin_id: i32,
         upper_bin_id: i32,
     ) -> Result<()> {
-        let InitializeStrategyMeteoraDlmm {
+        let MeteoraDlmmInitializePosition {
             authority,
             vault,
             strategy,

@@ -165,7 +165,7 @@ pub struct StrategyClosed {
 }
 
 #[event]
-pub struct JupiterSwapExecuted {
+pub struct JupiterSwapped {
     pub vault: Pubkey,
     pub strategy: Pubkey,
     pub source_mint: Pubkey,
@@ -174,16 +174,7 @@ pub struct JupiterSwapExecuted {
 }
 
 #[event]
-pub struct JupiterSwapExited {
-    pub vault: Pubkey,
-    pub strategy: Pubkey,
-    pub source_mint: Pubkey,
-    pub destination_mint: Pubkey,
-    pub amount: u64,
-}
-
-#[event]
-pub struct MeteoraDlmmExecuted {
+pub struct MeteoraDlmmLiquidityAdded {
     pub vault: Pubkey,
     pub strategy: Pubkey,
     pub position: Pubkey,
@@ -192,9 +183,21 @@ pub struct MeteoraDlmmExecuted {
 }
 
 #[event]
-pub struct MeteoraDlmmExited {
+pub struct MeteoraDlmmLiquidityRemoved {
     pub vault: Pubkey,
     pub strategy: Pubkey,
     pub position: Pubkey,
     pub bps_to_remove: u16,
+}
+
+#[event]
+pub struct MeteoraDlmmFeeClaimed {
+    pub vault: Pubkey,
+    pub strategy: Pubkey,
+    pub position: Pubkey,
+    /// Total fees claimed into the vault, including the treasury share.
+    pub amount_x: u64,
+    pub amount_y: u64,
+    pub treasury_amount_x: u64,
+    pub treasury_amount_y: u64,
 }

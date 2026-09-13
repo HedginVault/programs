@@ -107,10 +107,8 @@ pub enum HedgeVaultError {
     InvalidStrategy,
     #[msg("Strategy type is invalid for this operation")]
     InvalidStrategyType,
-    #[msg("Destination mint does not match")]
-    InvalidDestinationMint,
-    #[msg("Source mint does not match strategy destination mint")]
-    InvalidSourceMint,
+    #[msg("Target mint does not match strategy target mint")]
+    InvalidTargetMint,
 
     // Jupiter
     #[msg("Target mint of token account does not match")]

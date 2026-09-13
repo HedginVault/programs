@@ -12,7 +12,7 @@ use crate::jupiter::client::args::{
 pub const JUPITER_AGGREGATOR_EVENT_AUTHORITY: Pubkey =
     pubkey!("D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf");
 
-pub struct JupiterSwap<'info> {
+pub struct JupiterSwapCpi<'info> {
     pub token_program: AccountInfo<'info>,
     pub token_account_authority: AccountInfo<'info>,
     pub source_token_account: AccountInfo<'info>,
@@ -23,7 +23,7 @@ pub struct JupiterSwap<'info> {
     pub jupiter_program: AccountInfo<'info>,
 }
 
-impl<'info> JupiterSwap<'info> {
+impl<'info> JupiterSwapCpi<'info> {
     pub fn check_amount_and_slippage(
         swap_data: &[u8],
         amount: u64,
