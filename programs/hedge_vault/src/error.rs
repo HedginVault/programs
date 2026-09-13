@@ -77,6 +77,8 @@ pub enum HedgeVaultError {
     NoFeeToClaim,
     #[msg("Deposit mint has a Token-2022 extension the vault does not support")]
     InvalidDepositMintExtension,
+    #[msg("Vault NAV is zero, deposits are closed until NAV is restored")]
+    VaultNavIsZero,
 
     // NAV
     #[msg("NAV has already been updated for the current epoch")]
@@ -103,6 +105,8 @@ pub enum HedgeVaultError {
     RequestNotResolvable,
     #[msg("Request can no longer be cancelled, it must be resolved")]
     RequestNotCancellable,
+    #[msg("Deposit is too small to mint any shares at the current NAV")]
+    ZeroSharesMinted,
 
     // Strategy
     #[msg("Strategy address does not match")]

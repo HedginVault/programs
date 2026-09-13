@@ -346,6 +346,8 @@ impl Vault {
     // Requests
 
     pub fn request_deposit(&mut self, amount: u64) -> Result<()> {
+        validate!(self.nav_per_share > 0, HedgeVaultError::VaultNavIsZero)?;
+
         self.pending_deposits.safe_add_assign(amount)?;
 
         validate!(
@@ -362,18 +364,17 @@ impl Vault {
 
     /// Returns shares to mint for a resolved deposit at the current NAV.
     pub fn resolve_deposit(&mut self, amount: u64) -> Result<u64> {
+        // a zero NAV means existing shares are worthless, minting against them would hand the deposit to old holders
+        validate!(self.nav_per_share > 0, HedgeVaultError::VaultNavIsZero)?;
+
+        let shares = (amount as u128)
+            .safe_mul(NAV_PRECISION as u128)?
+            .safe_div(self.nav_per_share as u128)?
+            .safe_to_u64()?;
+        validate!(shares > 0, HedgeVaultError::ZeroSharesMinted)?;
+
         self.pending_deposits.safe_sub_assign(amount)?;
         self.total_assets.safe_add_assign(amount)?;
-
-        // a vault whose holdings went to zero restarts at 1 share per deposit mint unit
-        let shares = if self.nav_per_share == 0 {
-            amount
-        } else {
-            (amount as u128)
-                .safe_mul(NAV_PRECISION as u128)?
-                .safe_div(self.nav_per_share as u128)?
-                .safe_to_u64()?
-        };
 
         Ok(shares)
     }
@@ -577,5 +578,31 @@ mod tests {
             v.resolve_withdrawal(25 * USDC, 5_000),
             HedgeVaultError::EpochOutflowCapReached,
         );
+    }
+
+    #[test]
+    fn request_deposit_rejected_when_nav_is_zero() {
+        let mut v = new_vault(0, 0);
+        v.nav_per_share = 0;
+
+        assert_err(v.request_deposit(10 * USDC), HedgeVaultError::VaultNavIsZero);
+    }
+
+    #[test]
+    fn resolve_deposit_rejected_when_nav_is_zero() {
+        let mut v = new_vault(0, 0);
+        v.nav_per_share = 0;
+        v.pending_deposits = 10 * USDC;
+
+        assert_err(v.resolve_deposit(10 * USDC), HedgeVaultError::VaultNavIsZero);
+    }
+
+    #[test]
+    fn resolve_deposit_rejects_zero_shares() {
+        let mut v = new_vault(0, 0);
+        v.nav_per_share = 2 * NAV_PRECISION;
+        v.pending_deposits = 1;
+
+        assert_err(v.resolve_deposit(1), HedgeVaultError::ZeroSharesMinted);
     }
 }

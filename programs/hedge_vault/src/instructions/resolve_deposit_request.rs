@@ -126,20 +126,18 @@ impl<'info> ResolveDepositRequest<'info> {
             deposit_mint.decimals,
         )?;
 
-        if shares > 0 {
-            mint_to(
-                CpiContext::new(
-                    share_token_program.to_account_info(),
-                    MintTo {
-                        mint: share_mint.to_account_info(),
-                        to: depositor_share_token_account.to_account_info(),
-                        authority: vault_acc_info,
-                    },
-                )
-                .with_signer(&[vault_seeds]),
-                shares,
-            )?;
-        }
+        mint_to(
+            CpiContext::new(
+                share_token_program.to_account_info(),
+                MintTo {
+                    mint: share_mint.to_account_info(),
+                    to: depositor_share_token_account.to_account_info(),
+                    authority: vault_acc_info,
+                },
+            )
+            .with_signer(&[vault_seeds]),
+            shares,
+        )?;
 
         emit!(DepositResolved {
             vault: vault_key,

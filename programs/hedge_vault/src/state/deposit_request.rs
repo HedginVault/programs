@@ -73,12 +73,42 @@ impl DepositRequest {
         Ok(())
     }
 
-    pub fn is_cancellable(&self, vault_nav_epoch: u64) -> Result<()> {
+    /// Cancellable until a NAV is posted for the request, or while the vault NAV is zero and
+    /// the deposit cannot resolve.
+    pub fn is_cancellable(&self, vault_nav_epoch: u64, vault_nav_per_share: u64) -> Result<()> {
         validate!(
-            vault_nav_epoch <= self.epoch,
+            vault_nav_per_share == 0 || vault_nav_epoch <= self.epoch,
             HedgeVaultError::RequestNotCancellable
         )?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::NAV_PRECISION;
+
+    fn request(epoch: u64) -> DepositRequest {
+        DepositRequest::new(NewDepositRequestArgs {
+            authority: Pubkey::default(),
+            vault: Pubkey::default(),
+            epoch,
+            bump: 0,
+        })
+    }
+
+    #[test]
+    fn cancellable_until_a_nav_is_posted_for_the_request() {
+        let r = request(5);
+
+        assert!(r.is_cancellable(5, NAV_PRECISION).is_ok());
+        assert!(r.is_cancellable(6, NAV_PRECISION).is_err());
+    }
+
+    #[test]
+    fn cancellable_while_vault_nav_is_zero() {
+        assert!(request(5).is_cancellable(6, 0).is_ok());
     }
 }

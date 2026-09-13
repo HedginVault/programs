@@ -73,8 +73,8 @@ impl<'info> CancelDepositRequest<'info> {
         DepositRequest::validate_address(deposit_request_seeds, deposit_request_key)?;
         deposit_request.validate_authority(depositor_key)?;
         deposit_request.validate_vault(vault_key)?;
-        // once a NAV for the request is posted it must be resolved at that price
-        deposit_request.is_cancellable(vault.nav_epoch)?;
+        // once a NAV for the request is posted it must be resolved, unless NAV is zero
+        deposit_request.is_cancellable(vault.nav_epoch, vault.nav_per_share)?;
 
         let amount = deposit_request.amount;
         vault.cancel_deposit(amount)?;
