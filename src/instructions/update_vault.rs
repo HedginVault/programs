@@ -1,9 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{
-    error::HedgeVaultError, events::VaultUpdated, seeds::VAULT, validate, vault_seeds, Vault,
-    VaultStatus, MAX_BPS,
-};
+use crate::{events::VaultUpdated, seeds::VAULT, vault_seeds, Vault, VaultStatus};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct UpdateVaultArgs {
@@ -42,22 +39,10 @@ impl<'info> UpdateVault<'info> {
             vault.description = description;
         }
 
-        if let Some(performance_fee_bps) = args.performance_fee_bps {
-            validate!(
-                performance_fee_bps <= MAX_BPS,
-                HedgeVaultError::InvalidBasisPoints
-            )?;
-
-            vault.performance_fee_bps = performance_fee_bps;
-        }
-
-        if let Some(management_fee_bps) = args.management_fee_bps {
-            validate!(
-                management_fee_bps <= MAX_BPS,
-                HedgeVaultError::InvalidBasisPoints
-            )?;
-
-            vault.management_fee_bps = management_fee_bps;
+        // only touch fees when asked, so a status-only update never restarts a pending delay
+        if args.performance_fee_bps.is_some() || args.management_fee_bps.is_some() {
+            let now = Clock::get()?.unix_timestamp;
+            vault.update_fees(args.performance_fee_bps, args.management_fee_bps, now)?;
         }
 
         if let Some(deposit_cap) = args.deposit_cap {
@@ -80,6 +65,9 @@ impl<'info> UpdateVault<'info> {
             vault: vault_key,
             performance_fee_bps: vault.performance_fee_bps,
             management_fee_bps: vault.management_fee_bps,
+            pending_performance_fee_bps: vault.pending_performance_fee_bps,
+            pending_management_fee_bps: vault.pending_management_fee_bps,
+            fee_effective_ts: vault.fee_effective_ts,
             deposit_cap: vault.deposit_cap,
             min_deposit: vault.min_deposit,
             min_withdrawal_shares: vault.min_withdrawal_shares,

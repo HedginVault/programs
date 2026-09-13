@@ -4,7 +4,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 
 use crate::{
     error::HedgeVaultError, validate, validate_pda, SafeConvert, SafeMath, SafeMathAssign,
-    EPOCH_DURATION, MAX_BPS, NAV_PRECISION, SECONDS_PER_YEAR, VAULT_VERSION,
+    EPOCH_DURATION, FEE_INCREASE_DELAY, MAX_BPS, NAV_PRECISION, SECONDS_PER_YEAR, VAULT_VERSION,
 };
 
 pub struct NewVaultArgs {
@@ -335,6 +335,9 @@ impl Vault {
             }
         }
 
+        // after fee accrual, so the period that just ended is charged at the old rate
+        self.apply_pending_fees(now);
+
         self.total_assets = total_assets;
         self.nav_epoch = epoch;
         self.last_nav_ts = now;
@@ -451,6 +454,55 @@ impl Vault {
     }
 
     // Fees
+
+    /// Fee decreases apply immediately. If either resulting fee is higher than the live one,
+    /// the pair is scheduled and applied by the first NAV update after [FEE_INCREASE_DELAY].
+    pub fn update_fees(
+        &mut self,
+        performance_fee_bps: Option<u16>,
+        management_fee_bps: Option<u16>,
+        now: i64,
+    ) -> Result<()> {
+        // an omitted fee keeps its latest requested value
+        let (current_performance_fee_bps, current_management_fee_bps) = if self.fee_effective_ts == 0 {
+            (self.performance_fee_bps, self.management_fee_bps)
+        } else {
+            (self.pending_performance_fee_bps, self.pending_management_fee_bps)
+        };
+        let performance_fee_bps = performance_fee_bps.unwrap_or(current_performance_fee_bps);
+        let management_fee_bps = management_fee_bps.unwrap_or(current_management_fee_bps);
+
+        validate!(
+            performance_fee_bps <= MAX_BPS && management_fee_bps <= MAX_BPS,
+            HedgeVaultError::InvalidBasisPoints
+        )?;
+
+        if performance_fee_bps <= self.performance_fee_bps
+            && management_fee_bps <= self.management_fee_bps
+        {
+            self.performance_fee_bps = performance_fee_bps;
+            self.management_fee_bps = management_fee_bps;
+            self.pending_performance_fee_bps = 0;
+            self.pending_management_fee_bps = 0;
+            self.fee_effective_ts = 0;
+        } else {
+            self.pending_performance_fee_bps = performance_fee_bps;
+            self.pending_management_fee_bps = management_fee_bps;
+            self.fee_effective_ts = now.safe_add(FEE_INCREASE_DELAY)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn apply_pending_fees(&mut self, now: i64) {
+        if self.fee_effective_ts != 0 && now >= self.fee_effective_ts {
+            self.performance_fee_bps = self.pending_performance_fee_bps;
+            self.management_fee_bps = self.pending_management_fee_bps;
+            self.pending_performance_fee_bps = 0;
+            self.pending_management_fee_bps = 0;
+            self.fee_effective_ts = 0;
+        }
+    }
 
     pub fn claim_manager_fee(&mut self) -> Result<u64> {
         let shares = self.unclaimed_manager_fee_shares;
@@ -674,5 +726,64 @@ mod tests {
         v.request_withdrawal(50 * USDC, 100 * USDC).unwrap();
 
         assert_eq!(v.pending_withdrawal_shares, 90 * USDC);
+    }
+
+    #[test]
+    fn fee_decrease_applies_immediately() {
+        let mut v = new_vault(2_000, 200);
+        v.update_fees(Some(1_000), None, DAY).unwrap();
+
+        assert_eq!(v.performance_fee_bps, 1_000);
+        assert_eq!(v.management_fee_bps, 200);
+        assert_eq!(v.fee_effective_ts, 0);
+    }
+
+    #[test]
+    fn fee_increase_is_scheduled() {
+        let mut v = new_vault(1_000, 200);
+        v.update_fees(Some(2_000), None, DAY).unwrap();
+
+        assert_eq!(v.performance_fee_bps, 1_000);
+        assert_eq!(v.pending_performance_fee_bps, 2_000);
+        assert_eq!(v.pending_management_fee_bps, 200);
+        assert_eq!(v.fee_effective_ts, DAY + FEE_INCREASE_DELAY);
+    }
+
+    #[test]
+    fn decrease_cancels_a_pending_increase() {
+        let mut v = new_vault(1_000, 0);
+        v.update_fees(Some(2_000), None, 0).unwrap();
+        v.update_fees(Some(1_000), None, DAY).unwrap();
+
+        assert_eq!(v.performance_fee_bps, 1_000);
+        assert_eq!(v.fee_effective_ts, 0);
+    }
+
+    #[test]
+    fn update_fees_rejects_invalid_bps() {
+        let mut v = new_vault(0, 0);
+
+        assert_err(
+            v.update_fees(Some(MAX_BPS + 1), None, 0),
+            HedgeVaultError::InvalidBasisPoints,
+        );
+    }
+
+    #[test]
+    fn nav_update_applies_pending_fee_after_delay_at_the_old_rate() {
+        let mut v = new_vault(0, 0);
+        v.update_fees(None, Some(1_000), 0).unwrap();
+
+        v.update_nav(nav_args(0, 0, DAY)).unwrap();
+        assert_eq!(v.management_fee_bps, 0);
+
+        let update = v
+            .update_nav(nav_args(100 * USDC, 100 * USDC, FEE_INCREASE_DELAY))
+            .unwrap();
+
+        // the period that just ended accrued at the old 0 bps rate
+        assert_eq!(update.manager_fee_shares, 0);
+        assert_eq!(v.management_fee_bps, 1_000);
+        assert_eq!(v.fee_effective_ts, 0);
     }
 }
