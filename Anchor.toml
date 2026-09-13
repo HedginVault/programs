@@ -20,6 +20,7 @@ wallet = "~/.config/solana/idm.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test-litesvm = "anchor build && cargo test --manifest-path tests/litesvm/Cargo.toml"
 initialize-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/initialize_config.ts"
 migrate-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/migrate_config.ts"
 update-config = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/update_config.ts"
