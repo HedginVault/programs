@@ -17,7 +17,7 @@ describe("hedge_vault", () => {
     };
 
     const config = await program.account.config.fetch(getConfigPda());
-    const vault = getVaultPda(config.nextVaultId, wallet.publicKey);
+    const vault = getVaultPda(config.nextVaultId);
     log("Vault", vault);
 
     const ix = await program.methods

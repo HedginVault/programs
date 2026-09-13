@@ -97,18 +97,19 @@ pub struct Vault {
     pub unclaimed_platform_fee_shares: u64,
     /// Deposit mint paid out to withdrawals since the last NAV update.
     pub epoch_outflow: u64,
+    /// Next strategy ID, increments with each new strategy.
+    pub next_strategy_id: u32,
     /// Fee taken from profits above the high water mark that goes to the vault manager, denoted in basis points.
     pub performance_fee_bps: u16,
     /// Annualized fee taken on total assets that goes to the vault manager, denoted in basis points.
     pub management_fee_bps: u16,
     /// Determines operational status of the vault.
     pub status: VaultStatus,
-    /// Next strategy ID, increments with each new strategy.
-    pub next_strategy_id: u8,
     pub bump: u8,
     /// Layout version, see [VAULT_VERSION].
     pub version: u8,
-    padding1: [u64; 15],
+    padding0: [u8; 5],
+    padding1: [u64; 14],
 }
 
 impl Vault {
@@ -131,13 +132,14 @@ impl Vault {
             unclaimed_manager_fee_shares: 0,
             unclaimed_platform_fee_shares: 0,
             epoch_outflow: 0,
+            next_strategy_id: 0,
             performance_fee_bps: args.performance_fee_bps,
             management_fee_bps: args.management_fee_bps,
             status: VaultStatus::Normal,
-            next_strategy_id: 0,
             bump: args.bump,
             version: VAULT_VERSION,
-            padding1: [0; 15],
+            padding0: [0; 5],
+            padding1: [0; 14],
         }
     }
 

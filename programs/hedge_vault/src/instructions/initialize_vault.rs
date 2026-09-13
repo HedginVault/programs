@@ -34,7 +34,7 @@ pub struct InitializeVault<'info> {
         init,
         payer = authority,
         space = Vault::DISCRIMINATOR.len() + Vault::INIT_SPACE,
-        seeds = [VAULT, config.load()?.next_vault_id.to_le_bytes().as_ref(), authority.key().as_ref()],
+        seeds = [VAULT, config.load()?.next_vault_id.to_le_bytes().as_ref()],
         bump,
     )]
     pub vault: AccountLoader<'info, Vault>,

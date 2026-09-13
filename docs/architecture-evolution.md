@@ -150,9 +150,9 @@ flowchart TB
 | Account | Kind | Size | Free bytes | Lifetime |
 | --- | --- | --- | --- | --- |
 | Config | zero-copy | 160 | 6 | forever, singleton |
-| Vault | zero-copy | 424 | 121 | years |
+| Vault | zero-copy | 424 | 117 | years |
 | Manager | borsh | 41 | 0 | until removed |
-| Strategy | borsh | 97 | 6 (before enum) | until closed |
+| Strategy | borsh | 97 | 2 (before enum) | until closed |
 | DepositRequest / WithdrawalRequest | borsh | 89 | 0 | one or two epochs |
 
 Config v1, byte offsets including the 8-byte discriminator:
@@ -198,14 +198,20 @@ title Vault v1 - 424 bytes
 272-279: "unclaimed_manager_fee_shares"
 280-287: "unclaimed_platform_fee_shares"
 288-295: "epoch_outflow"
-296-297: "perf"
-298-299: "mgmt"
-300: "s"
-301: "n"
-302: "b"
-303: "p"
-304-423: "padding1 - 120 bytes reserved"
+296-299: "next_strategy_id"
+300-301: "perf"
+302-303: "mgmt"
+304: "s"
+305: "b"
+306: "v"
+307-311: "pad"
+312-423: "padding1 - 112 bytes reserved"
 ```
+
+Vault seeds are `["vault", id]` only. `authority` is a plain field, so a manager key can be
+rotated or handed to a multisig by a future `transfer_vault_authority` instruction without
+touching the PDA. `next_strategy_id` is `u32` because an LP vault opens a new position on
+every rebalance and a `u8` would cap the vault at 255 positions for life.
 
 ### 3.3 Growth mechanics and the migration flow
 
@@ -277,30 +283,29 @@ One transaction, done once.
 
 ### 3.5 Vault budget plan
 
-Vault has 121 free bytes. The plan below spends 77 and keeps 44. It fits only because of one
+Vault has 117 free bytes. The plan below spends 76 and keeps 36 plus 5 pad bytes. It fits only because of one
 rule: **no Pubkeys inside Vault.** Every link is a PDA derived from the vault key
 (`["policy", vault]`, `["operator", vault, key]`, `["settlement", vault, epoch]`), so a
 32-byte pointer costs zero bytes.
 
 ```mermaid
 packet-beta
-title Vault v2 - same 424 bytes, padding carved (bytes 303-423)
-0-302: "Vault v1 fields exactly as deployed"
-303: "v"
-304-311: "epoch_duration"
-312-319: "min_deposit"
-320-327: "min_withdrawal_shares"
-328-335: "last_override_ts"
-336-343: "total_deposited"
-344-351: "total_withdrawn"
-352-359: "fee_effective_ts"
-360-367: "epoch_inflow"
-368-369: "nav dev"
-370-371: "outflow"
-372-373: "pend perf"
-374-375: "pend mgmt"
-376-379: "nav_update_count"
-380-423: "reserved - 44 bytes"
+title Vault v2 - same 424 bytes, padding carved (bytes 312-423)
+0-311: "Vault v1 fields exactly as deployed"
+312-319: "epoch_duration"
+320-327: "min_deposit"
+328-335: "min_withdrawal_shares"
+336-343: "last_override_ts"
+344-351: "total_deposited"
+352-359: "total_withdrawn"
+360-367: "fee_effective_ts"
+368-375: "epoch_inflow"
+376-377: "nav dev"
+378-379: "outflow"
+380-381: "pend perf"
+382-383: "pend mgmt"
+384-387: "nav_update_count"
+388-423: "reserved - 36 bytes"
 ```
 
 | Field | Phase | Enforced / used in |
@@ -322,7 +327,7 @@ No realloc is needed for Vault through Phase 3.
 `ManagerPolicy` PDA `["manager_policy", authority]` (max vaults, max aggregate deposit cap,
 expiry, allowed protocols). The marker never migrates; policy can be recreated freely.
 
-**Strategy (97 bytes, 6 free before the enum).**
+**Strategy (97 bytes, 2 free before the enum).**
 
 ```mermaid
 packet-beta
@@ -331,16 +336,16 @@ title Strategy v1 - 97 bytes
 8-39: "vault"
 40-47: "created_ts"
 48-55: "last_action_ts"
-56: "id"
-57: "b"
-58: "v"
-59: "st"
-60-63: "pad"
+56-59: "id"
+60: "b"
+61: "v"
+62: "st"
+63: "pad"
 64: "enum tag"
 65-96: "payload: target_mint or position"
 ```
 
-- `version` and `status` (active / winding down / closed) take 2 of the 6 padding bytes now.
+- `status` (active / winding down / closed) takes 1 of the 2 padding bytes; `version` is already present.
 - Cumulative `deployed` / `withdrawn` counters (record keeping, not accounting) need a
   realloc. Bundle it with the first new protocol variant so managers migrate once.
 - New protocols are new enum variants. `StrategyType::space()` sizes each account at
@@ -623,8 +628,9 @@ flowchart TB
     IDL[declare_program! idls/x.json] --> E & X
 ```
 
-- Keep the MirrorFi shape. Each protocol is one enum variant, three instructions, one IDL,
-  and one arm in `close_strategy`.
+- Keep the MirrorFi shape for the protocols already shipped. For everything after, see
+  [drafts/composability.md](drafts/composability.md): protocols become separate adapter programs
+  behind one generic `execute_action`, and checks or effects around an action become hooks.
 - Adapter checklist: position owned by the vault PDA; only vault ATAs move tokens; no CPI can
   alter who signs for the vault; every account the protocol writes is passed explicitly.
 - Compute and size: DLMM already needs ~1.4M CU headroom and bin-array remaining accounts.

@@ -24,13 +24,8 @@ macro_rules! manager_seeds {
 
 #[macro_export]
 macro_rules! vault_seeds {
-    ($vault_id: expr, $vault_authority: expr, $bump: expr) => {
-        &[
-            VAULT,
-            $vault_id.as_ref(),
-            $vault_authority.as_ref(),
-            &[$bump],
-        ]
+    ($vault_id: expr, $bump: expr) => {
+        &[VAULT, $vault_id.as_ref(), &[$bump]]
     };
 }
 

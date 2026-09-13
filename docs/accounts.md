@@ -47,7 +47,7 @@ erDiagram
 
     VAULT {
         u64 id PK "from config.next_vault_id"
-        Pubkey authority PK "manager"
+        Pubkey authority FK "manager, not part of the seeds"
         bytes32 name
         bytes64 description
         Pubkey deposit_mint FK
@@ -66,7 +66,7 @@ erDiagram
         u16 performance_fee_bps
         u16 management_fee_bps "annualized"
         VaultStatus status
-        u8 next_strategy_id "auto-increment"
+        u32 next_strategy_id "auto-increment"
         u8 bump
         u8 version "layout version, 1"
     }
@@ -177,8 +177,8 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 
 | | |
 | --- | --- |
-| Seeds | `["vault", id (u64 LE), authority]` |
-| Layout | zero-copy, 424 bytes (120 reserved), version 1 |
+| Seeds | `["vault", id (u64 LE)]` |
+| Layout | zero-copy, 424 bytes (117 reserved), version 1 |
 | Created by | `initialize_vault` (manager) |
 | Mutated by | `update_vault`, `update_nav`, `override_nav`, request/cancel/resolve, fee claims, strategy init |
 | Closed by | `close_vault` when share supply, pending totals and unclaimed fee shares are all 0 |
@@ -186,7 +186,7 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | Field | Type | Description |
 | --- | --- | --- |
 | `id` | `u64` | Sequential id from config. |
-| `authority` | `Pubkey` | Manager; signs all strategy and vault management instructions. |
+| `authority` | `Pubkey` | Manager; signs all strategy and vault management instructions. Not part of the seeds, so it can be reassigned by a future instruction. |
 | `name` | `[u8; 32]` | UTF-8, zero padded. |
 | `description` | `[u8; 64]` | UTF-8, zero padded. |
 | `deposit_mint` | `Pubkey` | Only mint accepted for deposits and paid on withdrawals. |
@@ -202,10 +202,10 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | `unclaimed_manager_fee_shares` | `u64` | Shares owed to the manager, counted as supply in NAV math until minted by `claim_manager_fee`. |
 | `unclaimed_platform_fee_shares` | `u64` | Same for the platform, minted by `claim_platform_fee`. |
 | `epoch_outflow` | `u64` | Deposit mint paid to withdrawals since the last NAV update. Reset to 0 by `update_nav` / `override_nav`. Cap is `(total_assets + epoch_outflow) * max_epoch_outflow_bps / 10_000`. |
+| `next_strategy_id` | `u32` | Incremented on every strategy init. |
 | `performance_fee_bps` | `u16` | Manager cut of profit above high water mark. |
 | `management_fee_bps` | `u16` | Annualized manager fee on total assets. |
 | `status` | `VaultStatus` | `Normal` (0), `Paused` (1), `ReduceOnly` (2). Starts `Normal`. |
-| `next_strategy_id` | `u8` | Incremented on every strategy init. |
 | `bump` | `u8` | PDA bump. |
 | `version` | `u8` | Layout version, currently 1. |
 
@@ -236,7 +236,7 @@ Derived value used by `update_nav`: `virtual_supply = share_mint.supply + unclai
 | `vault` | `Pubkey` | Parent vault. |
 | `created_ts` | `i64` | Creation timestamp. |
 | `last_action_ts` | `i64` | Last execute or exit. |
-| `id` | `u8` | Sequential within the vault. |
+| `id` | `u32` | Sequential within the vault. |
 | `bump` | `u8` | PDA bump. |
 | `version` | `u8` | Layout version, currently 1. |
 | `strategy_type` | `StrategyType` | Enum, see below. |

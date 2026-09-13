@@ -22,7 +22,7 @@ impl StrategyType {
 
 pub struct NewStrategyArgs {
     pub vault: Pubkey,
-    pub id: u8,
+    pub id: u32,
     pub bump: u8,
     pub created_ts: i64,
     pub strategy_type: StrategyType,
@@ -38,11 +38,11 @@ pub struct Strategy {
     /// Timestamp of the last execute/exit on the strategy.
     pub last_action_ts: i64,
     /// ID unique to the strategy within the vault.
-    pub id: u8,
+    pub id: u32,
     pub bump: u8,
     /// Layout version, see [STRATEGY_VERSION].
     pub version: u8,
-    padding0: [u8; 5],
+    padding0: [u8; 2],
     /// Details about the underlying protocol and action of the strategy.
     pub strategy_type: StrategyType,
 }
@@ -56,7 +56,7 @@ impl Strategy {
             id: args.id,
             bump: args.bump,
             version: STRATEGY_VERSION,
-            padding0: [0; 5],
+            padding0: [0; 2],
             strategy_type: args.strategy_type,
         }
     }
@@ -74,8 +74,8 @@ impl Space for Strategy {
     const INIT_SPACE: usize = size_of::<Pubkey>()
         + size_of::<i64>()
         + size_of::<i64>()
+        + size_of::<u32>()
         + size_of::<u8>()
         + size_of::<u8>()
-        + size_of::<u8>()
-        + size_of::<u8>() * 5;
+        + size_of::<u8>() * 2;
 }

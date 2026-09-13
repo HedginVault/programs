@@ -7,7 +7,10 @@ withdrawals are requests resolved at the next posted NAV.
 
 Docs: [design spec](docs/superpowers/specs/2026-09-13-hedge-vault-design.md) ·
 [account data model](docs/accounts.md) ·
-[architecture evolution](docs/architecture-evolution.md)
+[architecture evolution](docs/architecture-evolution.md) ·
+drafts: [composability](docs/drafts/composability.md) ·
+[adapters](docs/drafts/adapters.md) ·
+[hooks](docs/drafts/hooks.md)
 
 ## Flows
 

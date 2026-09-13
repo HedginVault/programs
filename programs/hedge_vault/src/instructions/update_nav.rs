@@ -49,9 +49,8 @@ impl<'info> UpdateNav<'info> {
         let vault_key = vault.key();
         let vault = &mut vault.load_mut()?;
         let vault_id = vault.id.to_le_bytes();
-        let vault_authority = vault.authority.key();
         let vault_bump = vault.bump;
-        let vault_seeds = vault_seeds!(vault_id, vault_authority, vault_bump);
+        let vault_seeds = vault_seeds!(vault_id, vault_bump);
 
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.validate_deposit_mint(deposit_mint.key())?;

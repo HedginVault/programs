@@ -9,9 +9,14 @@ import {
 import { HedgeVault } from "../../target/types/hedge_vault";
 import { createTransaction, sendTransaction, simulateTransaction } from "../../utils/transaction";
 
-anchor.setProvider(anchor.AnchorProvider.env());
+/// Confirmed commitment for sends and reads, so a post-transaction fetch never sees a stale account.
+export const provider = new anchor.AnchorProvider(
+  new anchor.web3.Connection(process.env.ANCHOR_PROVIDER_URL!, "confirmed"),
+  anchor.AnchorProvider.env().wallet,
+  { commitment: "confirmed", preflightCommitment: "confirmed" },
+);
+anchor.setProvider(provider);
 
-export const provider = anchor.AnchorProvider.env();
 export const connection = provider.connection;
 export const wallet = provider.wallet;
 export const program = anchor.workspace.hedgeVault as Program<HedgeVault>;

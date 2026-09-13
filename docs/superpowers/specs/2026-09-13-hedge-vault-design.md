@@ -20,7 +20,7 @@ standard but with off-chain NAV. Anchor 0.31.1.
 | --- | --- | --- | --- |
 | Config | `["config"]` | zero-copy | admin, nav_updater, treasury_authority, guardian, platform fee bps, NAV safety bps, status, next_vault_id |
 | Manager | `["manager", authority]` | account | whitelist marker created/closed by admin |
-| Vault | `["vault", id, authority]` | zero-copy | metadata, share_mint, NAV state, pending totals, unclaimed fee shares |
+| Vault | `["vault", id]` | zero-copy | metadata, share_mint, NAV state, pending totals, unclaimed fee shares |
 | share mint | `["share_mint", vault]` | SPL mint | vault shares, decimals = deposit mint decimals, authority = vault |
 | deposit escrow | `["deposit_escrow", vault]` | token acct | pending deposit tokens, authority = vault |
 | share escrow | `["share_escrow", vault]` | token acct | pending withdrawal shares, authority = vault |

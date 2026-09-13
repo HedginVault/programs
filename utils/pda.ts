@@ -10,8 +10,8 @@ export const getConfigPda = () => find([Buffer.from("config")]);
 export const getManagerPda = (authority: PublicKey) =>
   find([Buffer.from("manager"), authority.toBuffer()]);
 
-export const getVaultPda = (id: InstanceType<typeof BN> | number, authority: PublicKey) =>
-  find([Buffer.from("vault"), new BN(id).toArrayLike(Buffer, "le", 8), authority.toBuffer()]);
+export const getVaultPda = (id: InstanceType<typeof BN> | number) =>
+  find([Buffer.from("vault"), new BN(id).toArrayLike(Buffer, "le", 8)]);
 
 export const getShareMintPda = (vault: PublicKey) =>
   find([Buffer.from("share_mint"), vault.toBuffer()]);
