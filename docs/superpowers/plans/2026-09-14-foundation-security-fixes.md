@@ -851,6 +851,35 @@ git commit -m "test: add LiteSVM harness with deposit/withdraw round trip"
 
 ---
 
+### Task 2b: Release the vault borrow before vault-signed CPIs (added during execution, user-approved)
+
+Found by Task 2: `resolve_deposit_request` failed with `AccountBorrowFailed`. `invoke_signed` borrows the data of every account passed to a CPI, and six handlers still held `vault.load_mut()` while the vault PDA signed a token CPI, so every resolve, cancel and fee claim failed. `close_vault`, `jupiter_swap` and the DLMM handlers already `drop(vault)` before CPIs.
+
+**Files:**
+- Modify: `programs/hedge_vault/src/instructions/{resolve_deposit_request,resolve_withdrawal_request,cancel_deposit_request,cancel_withdrawal_request,claim_manager_fee,claim_platform_fee}.rs`
+- Modify: `tests/litesvm/src/lib.rs` (helpers `cancel_withdrawal_request`, `claim_manager_fee`, `claim_platform_fee`)
+- Test: `tests/litesvm/tests/round_trip.rs` (resolves), `tests/litesvm/tests/cancel_and_claim.rs` (cancels, fee claims)
+
+Pattern applied in each handler:
+
+```rust
+        let mut vault = vault.load_mut()?; // was: let vault = &mut vault.load_mut()?;
+        // ... validations and state changes ...
+        let nav_per_share = vault.nav_per_share; // copy anything the event still needs
+
+        // CPIs borrow every passed account, the vault signs so its data must not stay borrowed
+        drop(vault);
+
+        // ... CPIs and emit! using the copied values ...
+```
+
+- [ ] Write `cancel_and_claim.rs` tests (cancel deposit, cancel withdrawal, claim manager fee and claim platform fee after a 20% performance fee NAV gain); run, expect `AccountBorrowFailed`.
+- [ ] Apply the pattern to the six handlers.
+- [ ] `anchor build && cargo test --manifest-path tests/litesvm/Cargo.toml` → round trip and cancel/claim tests pass.
+- [ ] Commit `fix: release vault borrow before vault-signed CPIs`.
+
+---
+
 ### Task 3: Reject unsafe Token-2022 deposit mints
 
 **Files:**
@@ -2588,7 +2617,7 @@ impl<'info> RejectDepositRequest<'info> {
         let vault_acc_info = vault.to_account_info();
 
         let vault_key = vault.key();
-        let vault = &mut vault.load_mut()?;
+        let mut vault = vault.load_mut()?;
         let vault_id = vault.id.to_le_bytes();
         let vault_bump = vault.bump;
         let vault_seeds = vault_seeds!(vault_id, vault_bump);
@@ -2608,6 +2637,9 @@ impl<'info> RejectDepositRequest<'info> {
 
         let amount = deposit_request.amount;
         vault.cancel_deposit(amount)?;
+
+        // CPIs borrow every passed account, the vault signs so its data must not stay borrowed
+        drop(vault);
 
         transfer_checked(
             CpiContext::new(
@@ -2714,7 +2746,7 @@ impl<'info> RejectWithdrawalRequest<'info> {
         let vault_acc_info = vault.to_account_info();
 
         let vault_key = vault.key();
-        let vault = &mut vault.load_mut()?;
+        let mut vault = vault.load_mut()?;
         let vault_id = vault.id.to_le_bytes();
         let vault_bump = vault.bump;
         let vault_seeds = vault_seeds!(vault_id, vault_bump);
@@ -2734,6 +2766,9 @@ impl<'info> RejectWithdrawalRequest<'info> {
 
         let shares = withdrawal_request.shares;
         vault.cancel_withdrawal(shares)?;
+
+        // CPIs borrow every passed account, the vault signs so its data must not stay borrowed
+        drop(vault);
 
         transfer_checked(
             CpiContext::new(
@@ -3030,7 +3065,7 @@ git commit -m "docs: document security hardening fields and rules"
 
 - [ ] **Step 1:** `cargo test -p hedge_vault` → 35 unit tests pass (1 existing `test_id` + 9 vault baseline + 9 token + 5 NAV-zero + 2 minimums + 5 fees + 4 config).
 - [ ] **Step 2:** `anchor build` → succeeds; `git diff --stat Cargo.lock` shows no change from test dependencies.
-- [ ] **Step 3:** `cargo test --manifest-path tests/litesvm/Cargo.toml` → 9 integration tests pass (round trip 1, deposit mint 2, minimums 2, fee delay 1, admin transfer 1, reject 2).
+- [ ] **Step 3:** `cargo test --manifest-path tests/litesvm/Cargo.toml` → 13 integration tests pass (round trip 1, cancel/claim 4, deposit mint 2, minimums 2, fee delay 1, admin transfer 1, reject 2).
 - [ ] **Step 4:** `yarn lint` → prettier check passes for the new and changed TS scripts (run `yarn lint:fix` if not).
 - [ ] **Step 5:** Check the IDL at `target/idl/hedge_vault.json` has `acceptAdmin`, `rejectDepositRequest`, `rejectWithdrawalRequest`, `pendingAdmin` in `UpdateConfigArgs`, and the new Vault fields.
 - [ ] **Step 6:** Mainnet upgrade note for the release: the live Config needs no migration (`pending_admin` reads as default from zeroed reserve). No vaults exist, so no request drain is needed.
