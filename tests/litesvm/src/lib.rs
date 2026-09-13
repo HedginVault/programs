@@ -314,6 +314,20 @@ impl TestContext {
             performance_fee_bps: 0,
             management_fee_bps: 0,
             deposit_cap: 1_000_000 * USDC,
+            min_deposit: 0,
+            min_withdrawal_shares: 0,
+        }
+    }
+
+    pub fn update_vault_args() -> UpdateVaultArgs {
+        UpdateVaultArgs {
+            description: None,
+            performance_fee_bps: None,
+            management_fee_bps: None,
+            deposit_cap: None,
+            min_deposit: None,
+            min_withdrawal_shares: None,
+            status: None,
         }
     }
 

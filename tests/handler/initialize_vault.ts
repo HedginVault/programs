@@ -14,6 +14,8 @@ describe("hedge_vault", () => {
       performanceFeeBps: 1000, // 10 %
       managementFeeBps: 200, // 2 % / year
       depositCap: new BN(1_000_000 * 10 ** DEPOSIT_MINT_DECIMALS),
+      minDeposit: new BN(10 * 10 ** DEPOSIT_MINT_DECIMALS),
+      minWithdrawalShares: new BN(0),
     };
 
     const config = await program.account.config.fetch(getConfigPda());

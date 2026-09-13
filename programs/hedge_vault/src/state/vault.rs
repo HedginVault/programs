@@ -15,6 +15,8 @@ pub struct NewVaultArgs {
     pub deposit_mint: Pubkey,
     pub share_mint: Pubkey,
     pub deposit_cap: u64,
+    pub min_deposit: u64,
+    pub min_withdrawal_shares: u64,
     pub performance_fee_bps: u16,
     pub management_fee_bps: u16,
     pub current_ts: i64,
@@ -109,7 +111,24 @@ pub struct Vault {
     /// Layout version, see [VAULT_VERSION].
     pub version: u8,
     padding0: [u8; 5],
-    padding1: [u64; 14],
+    /// 312..320, reserved for `epoch_duration`.
+    reserved0: [u8; 8],
+    /// Smallest deposit accepted per request, denoted in deposit mint. Zero disables the check.
+    pub min_deposit: u64,
+    /// Smallest shares accepted per withdrawal request unless it is the withdrawer's full balance. Zero disables the check.
+    pub min_withdrawal_shares: u64,
+    /// 336..360, reserved for `last_override_ts`, `total_deposited`, `total_withdrawn`.
+    reserved1: [u8; 24],
+    /// Timestamp from which the pending fees apply, zero when no fee change is pending.
+    pub fee_effective_ts: i64,
+    /// 368..380, reserved for `epoch_inflow` and per-vault deviation/outflow bps.
+    reserved2: [u8; 12],
+    /// Performance fee that replaces [Vault::performance_fee_bps] once [Vault::fee_effective_ts] has passed.
+    pub pending_performance_fee_bps: u16,
+    /// Management fee that replaces [Vault::management_fee_bps] once [Vault::fee_effective_ts] has passed.
+    pub pending_management_fee_bps: u16,
+    /// 384..424, reserved for `nav_update_count` and future fields.
+    reserved3: [u8; 40],
 }
 
 impl Vault {
@@ -139,7 +158,15 @@ impl Vault {
             bump: args.bump,
             version: VAULT_VERSION,
             padding0: [0; 5],
-            padding1: [0; 14],
+            reserved0: [0; 8],
+            min_deposit: args.min_deposit,
+            min_withdrawal_shares: args.min_withdrawal_shares,
+            reserved1: [0; 24],
+            fee_effective_ts: 0,
+            reserved2: [0; 12],
+            pending_performance_fee_bps: 0,
+            pending_management_fee_bps: 0,
+            reserved3: [0; 40],
         }
     }
 
@@ -347,6 +374,10 @@ impl Vault {
 
     pub fn request_deposit(&mut self, amount: u64) -> Result<()> {
         validate!(self.nav_per_share > 0, HedgeVaultError::VaultNavIsZero)?;
+        validate!(
+            amount >= self.min_deposit,
+            HedgeVaultError::DepositBelowMinimum
+        )?;
 
         self.pending_deposits.safe_add_assign(amount)?;
 
@@ -379,7 +410,13 @@ impl Vault {
         Ok(shares)
     }
 
-    pub fn request_withdrawal(&mut self, shares: u64) -> Result<()> {
+    pub fn request_withdrawal(&mut self, shares: u64, share_balance: u64) -> Result<()> {
+        // a holder below the minimum can still exit with their full balance
+        validate!(
+            shares >= self.min_withdrawal_shares || shares == share_balance,
+            HedgeVaultError::WithdrawalBelowMinimum
+        )?;
+
         self.pending_withdrawal_shares.safe_add_assign(shares)
     }
 
@@ -450,6 +487,8 @@ mod tests {
             deposit_mint: Pubkey::default(),
             share_mint: Pubkey::default(),
             deposit_cap: u64::MAX,
+            min_deposit: 0,
+            min_withdrawal_shares: 0,
             performance_fee_bps,
             management_fee_bps,
             current_ts: 0,
@@ -475,6 +514,13 @@ mod tests {
     #[test]
     fn layout_size_is_stable() {
         assert_eq!(core::mem::size_of::<Vault>(), 416);
+
+        // account offsets in docs/architecture-evolution.md 3.5 include the 8-byte discriminator
+        assert_eq!(core::mem::offset_of!(Vault, min_deposit) + 8, 320);
+        assert_eq!(core::mem::offset_of!(Vault, min_withdrawal_shares) + 8, 328);
+        assert_eq!(core::mem::offset_of!(Vault, fee_effective_ts) + 8, 360);
+        assert_eq!(core::mem::offset_of!(Vault, pending_performance_fee_bps) + 8, 380);
+        assert_eq!(core::mem::offset_of!(Vault, pending_management_fee_bps) + 8, 382);
     }
 
     #[test]
@@ -604,5 +650,29 @@ mod tests {
         v.pending_deposits = 1;
 
         assert_err(v.resolve_deposit(1), HedgeVaultError::ZeroSharesMinted);
+    }
+
+    #[test]
+    fn request_deposit_enforces_minimum() {
+        let mut v = new_vault(0, 0);
+        v.min_deposit = 10 * USDC;
+
+        assert_err(v.request_deposit(USDC), HedgeVaultError::DepositBelowMinimum);
+        v.request_deposit(10 * USDC).unwrap();
+    }
+
+    #[test]
+    fn request_withdrawal_enforces_minimum_unless_full_balance() {
+        let mut v = new_vault(0, 0);
+        v.min_withdrawal_shares = 50 * USDC;
+
+        assert_err(
+            v.request_withdrawal(40 * USDC, 100 * USDC),
+            HedgeVaultError::WithdrawalBelowMinimum,
+        );
+        v.request_withdrawal(40 * USDC, 40 * USDC).unwrap();
+        v.request_withdrawal(50 * USDC, 100 * USDC).unwrap();
+
+        assert_eq!(v.pending_withdrawal_shares, 90 * USDC);
     }
 }

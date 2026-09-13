@@ -8,6 +8,8 @@ describe("hedge_vault", () => {
       performanceFeeBps: null,
       managementFeeBps: null,
       depositCap: null,
+      minDeposit: null,
+      minWithdrawalShares: null,
       status: { normal: {} },
     };
 

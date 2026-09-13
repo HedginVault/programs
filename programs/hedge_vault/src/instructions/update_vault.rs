@@ -11,6 +11,8 @@ pub struct UpdateVaultArgs {
     pub performance_fee_bps: Option<u16>,
     pub management_fee_bps: Option<u16>,
     pub deposit_cap: Option<u64>,
+    pub min_deposit: Option<u64>,
+    pub min_withdrawal_shares: Option<u64>,
     pub status: Option<VaultStatus>,
 }
 
@@ -62,6 +64,14 @@ impl<'info> UpdateVault<'info> {
             vault.deposit_cap = deposit_cap;
         }
 
+        if let Some(min_deposit) = args.min_deposit {
+            vault.min_deposit = min_deposit;
+        }
+
+        if let Some(min_withdrawal_shares) = args.min_withdrawal_shares {
+            vault.min_withdrawal_shares = min_withdrawal_shares;
+        }
+
         if let Some(status) = args.status {
             vault.status = status;
         }
@@ -71,6 +81,8 @@ impl<'info> UpdateVault<'info> {
             performance_fee_bps: vault.performance_fee_bps,
             management_fee_bps: vault.management_fee_bps,
             deposit_cap: vault.deposit_cap,
+            min_deposit: vault.min_deposit,
+            min_withdrawal_shares: vault.min_withdrawal_shares,
             status: vault.status,
         });
 

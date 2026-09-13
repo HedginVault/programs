@@ -21,6 +21,8 @@ pub struct InitializeVaultArgs {
     pub performance_fee_bps: u16,
     pub management_fee_bps: u16,
     pub deposit_cap: u64,
+    pub min_deposit: u64,
+    pub min_withdrawal_shares: u64,
 }
 
 #[derive(Accounts)]
@@ -137,6 +139,8 @@ impl<'info> InitializeVault<'info> {
             deposit_mint: deposit_mint.key(),
             share_mint: share_mint.key(),
             deposit_cap: args.deposit_cap,
+            min_deposit: args.min_deposit,
+            min_withdrawal_shares: args.min_withdrawal_shares,
             performance_fee_bps: args.performance_fee_bps,
             management_fee_bps: args.management_fee_bps,
             current_ts: clock.unix_timestamp,
