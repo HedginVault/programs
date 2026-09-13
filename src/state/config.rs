@@ -64,7 +64,9 @@ pub struct Config {
     /// Layout version, see [CONFIG_VERSION].
     pub version: u8,
     padding1: [u8; 7],
-    reserve: [u64; 23],
+    /// Admin nominated through `update_config`, becomes admin once it signs `accept_admin`. Default pubkey when none.
+    pub pending_admin: Pubkey,
+    reserve: [u64; 19],
 }
 
 impl Config {
@@ -84,7 +86,8 @@ impl Config {
             padding0: [0; 6],
             version: CONFIG_VERSION,
             padding1: [0; 7],
-            reserve: [0; 23],
+            pending_admin: Pubkey::default(),
+            reserve: [0; 19],
         }
     }
 
@@ -122,6 +125,22 @@ impl Config {
         Ok(())
     }
 
+    pub fn nominate_admin(&mut self, pending_admin: Pubkey) {
+        self.pending_admin = pending_admin;
+    }
+
+    pub fn accept_admin(&mut self, signer: Pubkey) -> Result<()> {
+        validate!(
+            self.pending_admin != Pubkey::default() && self.pending_admin == signer,
+            HedgeVaultError::InvalidPendingAdmin
+        )?;
+
+        self.admin = signer;
+        self.pending_admin = Pubkey::default();
+
+        Ok(())
+    }
+
     pub fn pause(&mut self) {
         self.status = ProtocolStatus::Paused;
     }
@@ -152,5 +171,67 @@ impl Config {
         )?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn new_config(admin: Pubkey) -> Config {
+        Config::new(NewConfigArgs {
+            admin,
+            nav_updater: admin,
+            treasury_authority: admin,
+            guardian: admin,
+            platform_performance_fee_bps: 0,
+            platform_management_fee_bps: 0,
+            max_nav_deviation_bps: 0,
+            max_epoch_outflow_bps: 0,
+            bump: 0,
+        })
+    }
+
+    fn assert_err<T: core::fmt::Debug>(result: Result<T>, error: HedgeVaultError) {
+        assert_eq!(result.unwrap_err(), anchor_lang::error::Error::from(error));
+    }
+
+    #[test]
+    fn layout_size_is_stable() {
+        assert_eq!(core::mem::size_of::<Config>(), 344);
+
+        // account offset in docs/architecture-evolution.md 3.4 includes the 8-byte discriminator
+        assert_eq!(core::mem::offset_of!(Config, pending_admin) + 8, 168);
+    }
+
+    #[test]
+    fn accept_admin_requires_a_nomination() {
+        let admin = Pubkey::new_unique();
+        let mut config = new_config(admin);
+
+        assert_err(config.accept_admin(admin), HedgeVaultError::InvalidPendingAdmin);
+    }
+
+    #[test]
+    fn accept_admin_rejects_other_signers() {
+        let mut config = new_config(Pubkey::new_unique());
+        config.nominate_admin(Pubkey::new_unique());
+
+        assert_err(
+            config.accept_admin(Pubkey::new_unique()),
+            HedgeVaultError::InvalidPendingAdmin,
+        );
+    }
+
+    #[test]
+    fn accept_admin_transfers_and_clears_the_nomination() {
+        let mut config = new_config(Pubkey::new_unique());
+        let new_admin = Pubkey::new_unique();
+        config.nominate_admin(new_admin);
+
+        config.accept_admin(new_admin).unwrap();
+
+        assert_eq!(config.admin, new_admin);
+        assert_eq!(config.pending_admin, Pubkey::default());
     }
 }

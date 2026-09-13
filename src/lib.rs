@@ -60,6 +60,12 @@ pub mod hedge_vault {
         PauseProtocol::handler(ctx)
     }
 
+    // Pending admin
+
+    pub fn accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
+        AcceptAdmin::handler(ctx)
+    }
+
     // NAV Updater
 
     pub fn update_nav(ctx: Context<UpdateNav>, total_assets: u64) -> Result<()> {

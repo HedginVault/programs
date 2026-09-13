@@ -31,6 +31,18 @@ pub struct ConfigMigrated {
 }
 
 #[event]
+pub struct AdminNominated {
+    pub admin: Pubkey,
+    pub pending_admin: Pubkey,
+}
+
+#[event]
+pub struct AdminAccepted {
+    pub previous_admin: Pubkey,
+    pub admin: Pubkey,
+}
+
+#[event]
 pub struct ProtocolPaused {
     pub guardian: Pubkey,
 }

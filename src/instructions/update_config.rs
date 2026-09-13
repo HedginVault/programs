@@ -1,13 +1,17 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    config_seeds, error::HedgeVaultError, events::ConfigUpdated, seeds::CONFIG, validate,
+    config_seeds,
+    error::HedgeVaultError,
+    events::{AdminNominated, ConfigUpdated},
+    seeds::CONFIG,
+    validate,
     Config, ProtocolStatus, MAX_BPS,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct UpdateConfigArgs {
-    pub new_admin: Option<Pubkey>,
+    pub pending_admin: Option<Pubkey>,
     pub nav_updater: Option<Pubkey>,
     pub treasury_authority: Option<Pubkey>,
     pub guardian: Option<Pubkey>,
@@ -37,10 +41,19 @@ impl<'info> UpdateConfig<'info> {
         Config::validate_address(config_seeds, config_key)?;
         config.validate_admin(admin.key())?;
 
-        if let Some(new_admin) = args.new_admin {
-            validate!(new_admin != Pubkey::default(), HedgeVaultError::InvalidPubkey)?;
+        // the nominee takes over only after signing accept_admin; nominating the current admin cancels
+        if let Some(pending_admin) = args.pending_admin {
+            validate!(
+                pending_admin != Pubkey::default(),
+                HedgeVaultError::InvalidPubkey
+            )?;
 
-            config.admin = new_admin;
+            config.nominate_admin(pending_admin);
+
+            emit!(AdminNominated {
+                admin: config.admin,
+                pending_admin,
+            });
         }
 
         if let Some(nav_updater) = args.nav_updater {
