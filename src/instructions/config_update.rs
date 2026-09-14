@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct UpdateConfigArgs {
+pub struct ConfigUpdateArgs {
     pub pending_admin: Option<Pubkey>,
     pub nav_updater: Option<Pubkey>,
     pub treasury_authority: Option<Pubkey>,
@@ -24,15 +24,15 @@ pub struct UpdateConfigArgs {
 }
 
 #[derive(Accounts)]
-pub struct UpdateConfig<'info> {
+pub struct ConfigUpdate<'info> {
     pub admin: Signer<'info>,
     #[account(mut)]
     pub config: AccountLoader<'info, Config>,
 }
 
-impl<'info> UpdateConfig<'info> {
-    pub fn handler(ctx: Context<UpdateConfig>, args: UpdateConfigArgs) -> Result<()> {
-        let UpdateConfig { admin, config, .. } = ctx.accounts;
+impl<'info> ConfigUpdate<'info> {
+    pub fn handler(ctx: Context<ConfigUpdate>, args: ConfigUpdateArgs) -> Result<()> {
+        let ConfigUpdate { admin, config, .. } = ctx.accounts;
 
         let config_key = config.key();
         let config = &mut config.load_mut()?;
@@ -42,7 +42,7 @@ impl<'info> UpdateConfig<'info> {
         Config::validate_address(config_seeds, config_key)?;
         config.validate_admin(admin.key())?;
 
-        // the nominee takes over only after signing accept_admin; nominating the current admin cancels
+        // the nominee takes over only after signing admin_accept; nominating the current admin cancels
         if let Some(pending_admin) = args.pending_admin {
             validate!(
                 pending_admin != Pubkey::default(),

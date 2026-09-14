@@ -6,11 +6,11 @@ use crate::{
     error::HedgeVaultError,
     events::NavUpdated,
     seeds::{CONFIG, VAULT},
-    validate, vault_seeds, Config, UpdateNavArgs, Vault,
+    validate, vault_seeds, Config, NavUpdateArgs, Vault,
 };
 
 #[derive(Accounts)]
-pub struct UpdateNav<'info> {
+pub struct NavUpdate<'info> {
     pub nav_updater: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
     #[account(mut)]
@@ -26,9 +26,9 @@ pub struct UpdateNav<'info> {
     pub deposit_mint_token_program: Interface<'info, TokenInterface>,
 }
 
-impl<'info> UpdateNav<'info> {
-    pub fn handler(ctx: Context<UpdateNav>, total_assets: u64) -> Result<()> {
-        let UpdateNav {
+impl<'info> NavUpdate<'info> {
+    pub fn handler(ctx: Context<NavUpdate>, total_assets: u64) -> Result<()> {
+        let NavUpdate {
             nav_updater,
             config,
             vault,
@@ -63,7 +63,7 @@ impl<'info> UpdateNav<'info> {
 
         let now = Clock::get()?.unix_timestamp;
 
-        let nav_update = vault.update_nav(UpdateNavArgs {
+        let nav_update = vault.update_nav(NavUpdateArgs {
             total_assets,
             share_supply: share_mint.supply,
             platform_performance_fee_bps: config.platform_performance_fee_bps,

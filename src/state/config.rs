@@ -68,7 +68,7 @@ pub struct Config {
     /// Layout version, see [CONFIG_VERSION].
     pub version: u8,
     padding1: [u8; 7],
-    /// Admin nominated through `update_config`, becomes admin once it signs `accept_admin`. Default pubkey when none.
+    /// Admin nominated through `config_update`, becomes admin once it signs `admin_accept`. Default pubkey when none.
     pub pending_admin: Pubkey,
     /// Max slippage accepted on a routed swap, denoted in basis points. Zero means [DEFAULT_MAX_SLIPPAGE_BPS].
     pub max_slippage_bps: u16,

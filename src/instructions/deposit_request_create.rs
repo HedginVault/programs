@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct RequestDeposit<'info> {
+pub struct DepositRequestCreate<'info> {
     #[account(mut)]
     pub depositor: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
@@ -60,9 +60,9 @@ pub struct RequestDeposit<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-impl<'info> RequestDeposit<'info> {
-    pub fn handler(ctx: Context<RequestDeposit>, amount: u64) -> Result<()> {
-        let RequestDeposit {
+impl<'info> DepositRequestCreate<'info> {
+    pub fn handler(ctx: Context<DepositRequestCreate>, amount: u64) -> Result<()> {
+        let DepositRequestCreate {
             depositor,
             config,
             vault,

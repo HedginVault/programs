@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct CancelWithdrawalRequest<'info> {
+pub struct WithdrawalRequestCancel<'info> {
     #[account(mut)]
     pub withdrawer: Signer<'info>,
     #[account(mut)]
@@ -40,9 +40,9 @@ pub struct CancelWithdrawalRequest<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> CancelWithdrawalRequest<'info> {
-    pub fn handler(ctx: Context<CancelWithdrawalRequest>) -> Result<()> {
-        let CancelWithdrawalRequest {
+impl<'info> WithdrawalRequestCancel<'info> {
+    pub fn handler(ctx: Context<WithdrawalRequestCancel>) -> Result<()> {
+        let WithdrawalRequestCancel {
             withdrawer,
             vault,
             withdrawal_request,

@@ -15,7 +15,7 @@ use crate::{
 /// Admin returns escrowed shares of a pending withdrawal, e.g. for compliance. Allowed until the
 /// request is resolved and not gated by protocol status, so it also works while paused.
 #[derive(Accounts)]
-pub struct RejectWithdrawalRequest<'info> {
+pub struct WithdrawalRequestReject<'info> {
     pub admin: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
     #[account(mut)]
@@ -46,9 +46,9 @@ pub struct RejectWithdrawalRequest<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> RejectWithdrawalRequest<'info> {
-    pub fn handler(ctx: Context<RejectWithdrawalRequest>) -> Result<()> {
-        let RejectWithdrawalRequest {
+impl<'info> WithdrawalRequestReject<'info> {
+    pub fn handler(ctx: Context<WithdrawalRequestReject>) -> Result<()> {
+        let WithdrawalRequestReject {
             admin,
             config,
             vault,

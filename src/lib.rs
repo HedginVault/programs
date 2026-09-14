@@ -23,118 +23,121 @@ pub mod hedge_vault {
 
     // Admin only
 
-    pub fn initialize_config(
-        ctx: Context<InitializeConfig>,
-        args: InitializeConfigArgs,
+    pub fn config_initialize(
+        ctx: Context<ConfigInitialize>,
+        args: ConfigInitializeArgs,
     ) -> Result<()> {
-        InitializeConfig::handler(ctx, args)
+        ConfigInitialize::handler(ctx, args)
     }
 
-    pub fn update_config(ctx: Context<UpdateConfig>, args: UpdateConfigArgs) -> Result<()> {
-        UpdateConfig::handler(ctx, args)
+    pub fn config_update(ctx: Context<ConfigUpdate>, args: ConfigUpdateArgs) -> Result<()> {
+        ConfigUpdate::handler(ctx, args)
     }
 
-    pub fn add_manager(ctx: Context<AddManager>) -> Result<()> {
-        AddManager::handler(ctx)
+    pub fn config_add_manager(ctx: Context<ConfigAddManager>) -> Result<()> {
+        ConfigAddManager::handler(ctx)
     }
 
-    pub fn remove_manager(ctx: Context<RemoveManager>) -> Result<()> {
-        RemoveManager::handler(ctx)
+    pub fn config_remove_manager(ctx: Context<ConfigRemoveManager>) -> Result<()> {
+        ConfigRemoveManager::handler(ctx)
     }
 
-    pub fn claim_platform_fee(ctx: Context<ClaimPlatformFee>) -> Result<()> {
-        ClaimPlatformFee::handler(ctx)
+    pub fn config_claim_platform_fee(ctx: Context<ConfigClaimPlatformFee>) -> Result<()> {
+        ConfigClaimPlatformFee::handler(ctx)
     }
 
-    pub fn migrate_config(ctx: Context<MigrateConfig>) -> Result<()> {
-        MigrateConfig::handler(ctx)
+    pub fn config_migrate(ctx: Context<ConfigMigrate>) -> Result<()> {
+        ConfigMigrate::handler(ctx)
     }
 
-    pub fn override_nav(ctx: Context<OverrideNav>, total_assets: u64) -> Result<()> {
-        OverrideNav::handler(ctx, total_assets)
+    pub fn nav_override(ctx: Context<NavOverride>, total_assets: u64) -> Result<()> {
+        NavOverride::handler(ctx, total_assets)
     }
 
-    pub fn reject_deposit_request(ctx: Context<RejectDepositRequest>) -> Result<()> {
-        RejectDepositRequest::handler(ctx)
+    pub fn deposit_request_reject(ctx: Context<DepositRequestReject>) -> Result<()> {
+        DepositRequestReject::handler(ctx)
     }
 
-    pub fn reject_withdrawal_request(ctx: Context<RejectWithdrawalRequest>) -> Result<()> {
-        RejectWithdrawalRequest::handler(ctx)
+    pub fn withdrawal_request_reject(ctx: Context<WithdrawalRequestReject>) -> Result<()> {
+        WithdrawalRequestReject::handler(ctx)
     }
 
     // Guardian
 
-    pub fn pause_protocol(ctx: Context<PauseProtocol>) -> Result<()> {
-        PauseProtocol::handler(ctx)
+    pub fn config_pause(ctx: Context<ConfigPause>) -> Result<()> {
+        ConfigPause::handler(ctx)
     }
 
-    pub fn pause_vault(ctx: Context<PauseVault>) -> Result<()> {
-        PauseVault::handler(ctx)
+    pub fn vault_pause(ctx: Context<VaultPause>) -> Result<()> {
+        VaultPause::handler(ctx)
     }
 
     // Pending admin
 
-    pub fn accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
-        AcceptAdmin::handler(ctx)
+    pub fn admin_accept(ctx: Context<AdminAccept>) -> Result<()> {
+        AdminAccept::handler(ctx)
     }
 
     // NAV Updater
 
-    pub fn update_nav(ctx: Context<UpdateNav>, total_assets: u64) -> Result<()> {
-        UpdateNav::handler(ctx, total_assets)
+    pub fn nav_update(ctx: Context<NavUpdate>, total_assets: u64) -> Result<()> {
+        NavUpdate::handler(ctx, total_assets)
     }
 
     // Vault Manager
 
-    pub fn initialize_vault(
-        ctx: Context<InitializeVault>,
-        args: InitializeVaultArgs,
+    pub fn vault_initialize(
+        ctx: Context<VaultInitialize>,
+        args: VaultInitializeArgs,
     ) -> Result<()> {
-        InitializeVault::handler(ctx, args)
+        VaultInitialize::handler(ctx, args)
     }
 
-    pub fn update_vault(ctx: Context<UpdateVault>, args: UpdateVaultArgs) -> Result<()> {
-        UpdateVault::handler(ctx, args)
+    pub fn vault_update(ctx: Context<VaultUpdate>, args: VaultUpdateArgs) -> Result<()> {
+        VaultUpdate::handler(ctx, args)
     }
 
-    pub fn close_vault(ctx: Context<CloseVault>) -> Result<()> {
-        CloseVault::handler(ctx)
+    pub fn vault_close(ctx: Context<VaultClose>) -> Result<()> {
+        VaultClose::handler(ctx)
     }
 
-    pub fn close_strategy<'info>(
-        ctx: Context<'_, '_, '_, 'info, CloseStrategy<'info>>,
+    pub fn vault_close_strategy<'info>(
+        ctx: Context<'_, '_, '_, 'info, VaultCloseStrategy<'info>>,
     ) -> Result<()> {
-        CloseStrategy::handler(ctx)
+        VaultCloseStrategy::handler(ctx)
     }
 
-    pub fn claim_manager_fee(ctx: Context<ClaimManagerFee>) -> Result<()> {
-        ClaimManagerFee::handler(ctx)
+    pub fn vault_claim_manager_fee(ctx: Context<VaultClaimManagerFee>) -> Result<()> {
+        VaultClaimManagerFee::handler(ctx)
     }
 
     // User
 
-    pub fn request_deposit(ctx: Context<RequestDeposit>, amount: u64) -> Result<()> {
-        RequestDeposit::handler(ctx, amount)
+    pub fn deposit_request_create(ctx: Context<DepositRequestCreate>, amount: u64) -> Result<()> {
+        DepositRequestCreate::handler(ctx, amount)
     }
 
-    pub fn cancel_deposit_request(ctx: Context<CancelDepositRequest>) -> Result<()> {
-        CancelDepositRequest::handler(ctx)
+    pub fn deposit_request_cancel(ctx: Context<DepositRequestCancel>) -> Result<()> {
+        DepositRequestCancel::handler(ctx)
     }
 
-    pub fn resolve_deposit_request(ctx: Context<ResolveDepositRequest>) -> Result<()> {
-        ResolveDepositRequest::handler(ctx)
+    pub fn deposit_request_resolve(ctx: Context<DepositRequestResolve>) -> Result<()> {
+        DepositRequestResolve::handler(ctx)
     }
 
-    pub fn request_withdrawal(ctx: Context<RequestWithdrawal>, shares: u64) -> Result<()> {
-        RequestWithdrawal::handler(ctx, shares)
+    pub fn withdrawal_request_create(
+        ctx: Context<WithdrawalRequestCreate>,
+        shares: u64,
+    ) -> Result<()> {
+        WithdrawalRequestCreate::handler(ctx, shares)
     }
 
-    pub fn cancel_withdrawal_request(ctx: Context<CancelWithdrawalRequest>) -> Result<()> {
-        CancelWithdrawalRequest::handler(ctx)
+    pub fn withdrawal_request_cancel(ctx: Context<WithdrawalRequestCancel>) -> Result<()> {
+        WithdrawalRequestCancel::handler(ctx)
     }
 
-    pub fn resolve_withdrawal_request(ctx: Context<ResolveWithdrawalRequest>) -> Result<()> {
-        ResolveWithdrawalRequest::handler(ctx)
+    pub fn withdrawal_request_resolve(ctx: Context<WithdrawalRequestResolve>) -> Result<()> {
+        WithdrawalRequestResolve::handler(ctx)
     }
 
     // Jupiter

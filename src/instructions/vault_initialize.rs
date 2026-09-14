@@ -15,7 +15,7 @@ use crate::{
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct InitializeVaultArgs {
+pub struct VaultInitializeArgs {
     pub name: [u8; 32],
     pub performance_fee_bps: u16,
     pub management_fee_bps: u16,
@@ -25,7 +25,7 @@ pub struct InitializeVaultArgs {
 }
 
 #[derive(Accounts)]
-pub struct InitializeVault<'info> {
+pub struct VaultInitialize<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
@@ -86,9 +86,9 @@ pub struct InitializeVault<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-impl<'info> InitializeVault<'info> {
-    pub fn handler(ctx: Context<InitializeVault>, args: InitializeVaultArgs) -> Result<()> {
-        let InitializeVault {
+impl<'info> VaultInitialize<'info> {
+    pub fn handler(ctx: Context<VaultInitialize>, args: VaultInitializeArgs) -> Result<()> {
+        let VaultInitialize {
             authority,
             config,
             manager,

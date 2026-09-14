@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct CloseStrategy<'info> {
+pub struct VaultCloseStrategy<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
@@ -28,9 +28,9 @@ pub struct CloseStrategy<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> CloseStrategy<'info> {
-    pub fn handler(ctx: Context<'_, '_, '_, 'info, CloseStrategy<'info>>) -> Result<()> {
-        let CloseStrategy {
+impl<'info> VaultCloseStrategy<'info> {
+    pub fn handler(ctx: Context<'_, '_, '_, 'info, VaultCloseStrategy<'info>>) -> Result<()> {
+        let VaultCloseStrategy {
             authority,
             config,
             vault,

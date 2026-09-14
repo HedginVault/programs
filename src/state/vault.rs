@@ -22,12 +22,12 @@ pub struct NewVaultArgs {
     pub bump: u8,
 }
 
-pub struct NavUpdate {
+pub struct NavFeeShares {
     pub manager_fee_shares: u64,
     pub platform_fee_shares: u64,
 }
 
-pub struct UpdateNavArgs {
+pub struct NavUpdateArgs {
     /// Total value of vault holdings across all strategies, denoted in deposit mint.
     pub total_assets: u64,
     /// Current supply of the share mint, excluding unclaimed fee shares.
@@ -245,8 +245,8 @@ impl Vault {
     // NAV
 
     /// Settles fees as share dilution and records the new NAV. Callable once per epoch.
-    pub fn update_nav(&mut self, args: UpdateNavArgs) -> Result<NavUpdate> {
-        let UpdateNavArgs {
+    pub fn update_nav(&mut self, args: NavUpdateArgs) -> Result<NavFeeShares> {
+        let NavUpdateArgs {
             total_assets,
             share_supply,
             platform_performance_fee_bps,
@@ -266,7 +266,7 @@ impl Vault {
             .safe_add(self.unclaimed_manager_fee_shares)?
             .safe_add(self.unclaimed_platform_fee_shares)? as u128;
 
-        let mut nav_update = NavUpdate {
+        let mut nav_update = NavFeeShares {
             manager_fee_shares: 0,
             platform_fee_shares: 0,
         };
@@ -562,8 +562,8 @@ mod tests {
         })
     }
 
-    fn nav_args(total_assets: u64, share_supply: u64, now: i64) -> UpdateNavArgs {
-        UpdateNavArgs {
+    fn nav_args(total_assets: u64, share_supply: u64, now: i64) -> NavUpdateArgs {
+        NavUpdateArgs {
             total_assets,
             share_supply,
             platform_performance_fee_bps: 0,

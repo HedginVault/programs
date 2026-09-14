@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct CloseVault<'info> {
+pub struct VaultClose<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(
@@ -47,9 +47,9 @@ pub struct CloseVault<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> CloseVault<'info> {
-    pub fn handler(ctx: Context<CloseVault>) -> Result<()> {
-        let CloseVault {
+impl<'info> VaultClose<'info> {
+    pub fn handler(ctx: Context<VaultClose>) -> Result<()> {
+        let VaultClose {
             authority,
             vault,
             deposit_mint,

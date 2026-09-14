@@ -14,7 +14,7 @@ use crate::{
 
 /// Permissionless, anyone can resolve a request once NAV is updated.
 #[derive(Accounts)]
-pub struct ResolveDepositRequest<'info> {
+pub struct DepositRequestResolve<'info> {
     pub resolver: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
     #[account(mut)]
@@ -55,9 +55,9 @@ pub struct ResolveDepositRequest<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> ResolveDepositRequest<'info> {
-    pub fn handler(ctx: Context<ResolveDepositRequest>) -> Result<()> {
-        let ResolveDepositRequest {
+impl<'info> DepositRequestResolve<'info> {
+    pub fn handler(ctx: Context<DepositRequestResolve>) -> Result<()> {
+        let DepositRequestResolve {
             config,
             vault,
             depositor,

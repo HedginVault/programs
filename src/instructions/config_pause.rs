@@ -3,15 +3,15 @@ use anchor_lang::prelude::*;
 use crate::{config_seeds, events::ProtocolPaused, seeds::CONFIG, Config};
 
 #[derive(Accounts)]
-pub struct PauseProtocol<'info> {
+pub struct ConfigPause<'info> {
     pub guardian: Signer<'info>,
     #[account(mut)]
     pub config: AccountLoader<'info, Config>,
 }
 
-impl<'info> PauseProtocol<'info> {
-    pub fn handler(ctx: Context<PauseProtocol>) -> Result<()> {
-        let PauseProtocol {
+impl<'info> ConfigPause<'info> {
+    pub fn handler(ctx: Context<ConfigPause>) -> Result<()> {
+        let ConfigPause {
             guardian, config, ..
         } = ctx.accounts;
 

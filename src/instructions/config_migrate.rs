@@ -10,7 +10,7 @@ use crate::{
 
 /// Grows the deployed v1 config (160 bytes) to the current layout. Runs once.
 #[derive(Accounts)]
-pub struct MigrateConfig<'info> {
+pub struct ConfigMigrate<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
     /// CHECK: v1 layout cannot be typed before it is resized, validated in [handler]
@@ -23,9 +23,9 @@ pub struct MigrateConfig<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> MigrateConfig<'info> {
-    pub fn handler(ctx: Context<MigrateConfig>) -> Result<()> {
-        let MigrateConfig {
+impl<'info> ConfigMigrate<'info> {
+    pub fn handler(ctx: Context<ConfigMigrate>) -> Result<()> {
+        let ConfigMigrate {
             admin,
             config,
             system_program,

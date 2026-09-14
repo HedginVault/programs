@@ -5,18 +5,23 @@ use anchor_spl::{
 };
 
 use crate::{
-    deposit_request_seeds,
-    events::DepositCancelled,
-    seeds::{DEPOSIT_ESCROW, DEPOSIT_REQUEST, VAULT},
-    vault_seeds, DepositRequest, Vault,
+    config_seeds, deposit_request_seeds,
+    events::DepositRejected,
+    seeds::{CONFIG, DEPOSIT_ESCROW, DEPOSIT_REQUEST, VAULT},
+    vault_seeds, Config, DepositRequest, Vault,
 };
 
+/// Admin refunds a pending deposit, e.g. for compliance. Allowed until the request is resolved
+/// and not gated by protocol status, so it also works while paused.
 #[derive(Accounts)]
-pub struct CancelDepositRequest<'info> {
-    #[account(mut)]
-    pub depositor: Signer<'info>,
+pub struct DepositRequestReject<'info> {
+    pub admin: Signer<'info>,
+    pub config: AccountLoader<'info, Config>,
     #[account(mut)]
     pub vault: AccountLoader<'info, Vault>,
+    /// CHECK: Request authority, validated in [handler]. Receives the refund and the rent of the closed request.
+    #[account(mut)]
+    pub depositor: UncheckedAccount<'info>,
     #[account(
         mut,
         close = depositor,
@@ -40,11 +45,13 @@ pub struct CancelDepositRequest<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> CancelDepositRequest<'info> {
-    pub fn handler(ctx: Context<CancelDepositRequest>) -> Result<()> {
-        let CancelDepositRequest {
-            depositor,
+impl<'info> DepositRequestReject<'info> {
+    pub fn handler(ctx: Context<DepositRequestReject>) -> Result<()> {
+        let DepositRequestReject {
+            admin,
+            config,
             vault,
+            depositor,
             deposit_request,
             deposit_mint,
             depositor_token_account,
@@ -52,6 +59,14 @@ impl<'info> CancelDepositRequest<'info> {
             deposit_mint_token_program,
             ..
         } = ctx.accounts;
+
+        let config_key = config.key();
+        let config = config.load()?;
+        let config_bump = config.bump;
+        let config_seeds = config_seeds!(config_bump);
+
+        Config::validate_address(config_seeds, config_key)?;
+        config.validate_admin(admin.key())?;
 
         let vault_acc_info = vault.to_account_info();
 
@@ -73,8 +88,6 @@ impl<'info> CancelDepositRequest<'info> {
         DepositRequest::validate_address(deposit_request_seeds, deposit_request_key)?;
         deposit_request.validate_authority(depositor_key)?;
         deposit_request.validate_vault(vault_key)?;
-        // once a NAV for the request is posted it must be resolved, unless NAV is zero
-        deposit_request.is_cancellable(vault.nav_epoch, vault.nav_per_share)?;
 
         let amount = deposit_request.amount;
         vault.cancel_deposit(amount)?;
@@ -97,7 +110,7 @@ impl<'info> CancelDepositRequest<'info> {
             deposit_mint.decimals,
         )?;
 
-        emit!(DepositCancelled {
+        emit!(DepositRejected {
             vault: vault_key,
             authority: depositor_key,
             amount,

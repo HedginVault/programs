@@ -6,54 +6,39 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount},
 };
 
-use crate::{
-    config_seeds,
-    events::PlatformFeeClaimed,
-    seeds::{CONFIG, VAULT},
-    vault_seeds, Config, Vault,
-};
+use crate::{events::ManagerFeeClaimed, seeds::VAULT, vault_seeds, Vault};
 
 #[derive(Accounts)]
-pub struct ClaimPlatformFee<'info> {
+pub struct VaultClaimManagerFee<'info> {
     #[account(mut)]
-    pub treasury_authority: Signer<'info>,
-    pub config: AccountLoader<'info, Config>,
+    pub authority: Signer<'info>,
     #[account(mut)]
     pub vault: AccountLoader<'info, Vault>,
     #[account(mut)]
     pub share_mint: InterfaceAccount<'info, Mint>,
     #[account(
         init_if_needed,
-        payer = treasury_authority,
+        payer = authority,
         associated_token::mint = share_mint,
-        associated_token::authority = treasury_authority,
+        associated_token::authority = authority,
         associated_token::token_program = share_token_program,
     )]
-    pub treasury_authority_share_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub authority_share_token_account: InterfaceAccount<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
     pub share_token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-impl<'info> ClaimPlatformFee<'info> {
-    pub fn handler(ctx: Context<ClaimPlatformFee>) -> Result<()> {
-        let ClaimPlatformFee {
-            treasury_authority,
-            config,
+impl<'info> VaultClaimManagerFee<'info> {
+    pub fn handler(ctx: Context<VaultClaimManagerFee>) -> Result<()> {
+        let VaultClaimManagerFee {
+            authority,
             vault,
             share_mint,
-            treasury_authority_share_token_account,
+            authority_share_token_account,
             share_token_program,
             ..
         } = ctx.accounts;
-
-        let config_key = config.key();
-        let config = config.load()?;
-        let config_bump = config.bump;
-        let config_seeds = config_seeds!(config_bump);
-
-        Config::validate_address(config_seeds, config_key)?;
-        config.validate_treasury_authority(treasury_authority.key())?;
 
         let vault_acc_info = vault.to_account_info();
 
@@ -64,9 +49,10 @@ impl<'info> ClaimPlatformFee<'info> {
         let vault_seeds = vault_seeds!(vault_id, vault_bump);
 
         Vault::validate_address(vault_seeds, vault_key)?;
+        vault.validate_authority(authority.key())?;
         vault.validate_share_mint(share_mint.key())?;
 
-        let shares = vault.claim_platform_fee()?;
+        let shares = vault.claim_manager_fee()?;
 
         // CPIs borrow every passed account, the vault signs so its data must not stay borrowed
         drop(vault);
@@ -76,7 +62,7 @@ impl<'info> ClaimPlatformFee<'info> {
                 share_token_program.to_account_info(),
                 MintTo {
                     mint: share_mint.to_account_info(),
-                    to: treasury_authority_share_token_account.to_account_info(),
+                    to: authority_share_token_account.to_account_info(),
                     authority: vault_acc_info,
                 },
             )
@@ -84,9 +70,9 @@ impl<'info> ClaimPlatformFee<'info> {
             shares,
         )?;
 
-        emit!(PlatformFeeClaimed {
+        emit!(ManagerFeeClaimed {
             vault: vault_key,
-            authority: treasury_authority.key(),
+            authority: authority.key(),
             shares,
         });
 

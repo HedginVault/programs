@@ -2,17 +2,17 @@ use anchor_lang::prelude::*;
 
 use crate::{config_seeds, events::AdminAccepted, seeds::CONFIG, Config};
 
-/// Completes the two-step admin transfer started by `update_config`.
+/// Completes the two-step admin transfer started by `config_update`.
 #[derive(Accounts)]
-pub struct AcceptAdmin<'info> {
+pub struct AdminAccept<'info> {
     pub pending_admin: Signer<'info>,
     #[account(mut)]
     pub config: AccountLoader<'info, Config>,
 }
 
-impl<'info> AcceptAdmin<'info> {
-    pub fn handler(ctx: Context<AcceptAdmin>) -> Result<()> {
-        let AcceptAdmin {
+impl<'info> AdminAccept<'info> {
+    pub fn handler(ctx: Context<AdminAccept>) -> Result<()> {
+        let AdminAccept {
             pending_admin,
             config,
         } = ctx.accounts;

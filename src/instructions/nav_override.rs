@@ -6,12 +6,12 @@ use crate::{
     error::HedgeVaultError,
     events::NavUpdated,
     seeds::{CONFIG, VAULT},
-    validate, vault_seeds, Config, UpdateNavArgs, Vault,
+    validate, vault_seeds, Config, NavUpdateArgs, Vault,
 };
 
 /// Admin path for NAV updates that exceed the deviation bound.
 #[derive(Accounts)]
-pub struct OverrideNav<'info> {
+pub struct NavOverride<'info> {
     pub admin: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
     #[account(mut)]
@@ -27,9 +27,9 @@ pub struct OverrideNav<'info> {
     pub deposit_mint_token_program: Interface<'info, TokenInterface>,
 }
 
-impl<'info> OverrideNav<'info> {
-    pub fn handler(ctx: Context<OverrideNav>, total_assets: u64) -> Result<()> {
-        let OverrideNav {
+impl<'info> NavOverride<'info> {
+    pub fn handler(ctx: Context<NavOverride>, total_assets: u64) -> Result<()> {
+        let NavOverride {
             admin,
             config,
             vault,
@@ -64,7 +64,7 @@ impl<'info> OverrideNav<'info> {
 
         let now = Clock::get()?.unix_timestamp;
 
-        let nav_update = vault.update_nav(UpdateNavArgs {
+        let nav_update = vault.update_nav(NavUpdateArgs {
             total_assets,
             share_supply: share_mint.supply,
             platform_performance_fee_bps: config.platform_performance_fee_bps,

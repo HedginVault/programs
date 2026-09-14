@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct InitializeConfigArgs {
+pub struct ConfigInitializeArgs {
     pub nav_updater: Pubkey,
     pub treasury_authority: Pubkey,
     pub guardian: Pubkey,
@@ -18,7 +18,7 @@ pub struct InitializeConfigArgs {
 }
 
 #[derive(Accounts)]
-pub struct InitializeConfig<'info> {
+pub struct ConfigInitialize<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
     #[account(
@@ -32,9 +32,9 @@ pub struct InitializeConfig<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> InitializeConfig<'info> {
-    pub fn handler(ctx: Context<InitializeConfig>, args: InitializeConfigArgs) -> Result<()> {
-        let InitializeConfig { admin, config, .. } = ctx.accounts;
+impl<'info> ConfigInitialize<'info> {
+    pub fn handler(ctx: Context<ConfigInitialize>, args: ConfigInitializeArgs) -> Result<()> {
+        let ConfigInitialize { admin, config, .. } = ctx.accounts;
 
         validate!(
             args.nav_updater != Pubkey::default(),

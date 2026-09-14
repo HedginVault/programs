@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct AddManager<'info> {
+pub struct ConfigAddManager<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
@@ -25,9 +25,9 @@ pub struct AddManager<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> AddManager<'info> {
-    pub fn handler(ctx: Context<AddManager>) -> Result<()> {
-        let AddManager {
+impl<'info> ConfigAddManager<'info> {
+    pub fn handler(ctx: Context<ConfigAddManager>) -> Result<()> {
+        let ConfigAddManager {
             admin,
             config,
             authority,

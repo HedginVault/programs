@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct RequestWithdrawal<'info> {
+pub struct WithdrawalRequestCreate<'info> {
     #[account(mut)]
     pub withdrawer: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
@@ -60,9 +60,9 @@ pub struct RequestWithdrawal<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-impl<'info> RequestWithdrawal<'info> {
-    pub fn handler(ctx: Context<RequestWithdrawal>, shares: u64) -> Result<()> {
-        let RequestWithdrawal {
+impl<'info> WithdrawalRequestCreate<'info> {
+    pub fn handler(ctx: Context<WithdrawalRequestCreate>, shares: u64) -> Result<()> {
+        let WithdrawalRequestCreate {
             withdrawer,
             config,
             vault,

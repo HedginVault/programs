@@ -8,16 +8,16 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct PauseVault<'info> {
+pub struct VaultPause<'info> {
     pub guardian: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
     #[account(mut)]
     pub vault: AccountLoader<'info, Vault>,
 }
 
-impl<'info> PauseVault<'info> {
-    pub fn handler(ctx: Context<PauseVault>) -> Result<()> {
-        let PauseVault {
+impl<'info> VaultPause<'info> {
+    pub fn handler(ctx: Context<VaultPause>) -> Result<()> {
+        let VaultPause {
             guardian,
             config,
             vault,

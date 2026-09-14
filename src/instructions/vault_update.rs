@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct UpdateVaultArgs {
+pub struct VaultUpdateArgs {
     pub performance_fee_bps: Option<u16>,
     pub management_fee_bps: Option<u16>,
     pub deposit_cap: Option<u64>,
@@ -16,15 +16,15 @@ pub struct UpdateVaultArgs {
 }
 
 #[derive(Accounts)]
-pub struct UpdateVault<'info> {
+pub struct VaultUpdate<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub vault: AccountLoader<'info, Vault>,
 }
 
-impl<'info> UpdateVault<'info> {
-    pub fn handler(ctx: Context<UpdateVault>, args: UpdateVaultArgs) -> Result<()> {
-        let UpdateVault {
+impl<'info> VaultUpdate<'info> {
+    pub fn handler(ctx: Context<VaultUpdate>, args: VaultUpdateArgs) -> Result<()> {
+        let VaultUpdate {
             authority, vault, ..
         } = ctx.accounts;
 
