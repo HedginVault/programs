@@ -6,6 +6,7 @@ pub struct NewDepositRequestArgs {
     pub authority: Pubkey,
     pub vault: Pubkey,
     pub epoch: u64,
+    pub created_ts: i64,
     pub bump: u8,
 }
 
@@ -21,7 +22,11 @@ pub struct DepositRequest {
     pub amount: u64,
     /// Epoch the request was made in.
     pub epoch: u64,
+    /// Timestamp the request was created.
+    pub created_ts: i64,
     pub bump: u8,
+    /// Reserved for future fields.
+    pub reserved: [u8; 32],
 }
 
 impl DepositRequest {
@@ -31,7 +36,9 @@ impl DepositRequest {
             vault: args.vault,
             amount: 0,
             epoch: args.epoch,
+            created_ts: args.created_ts,
             bump: args.bump,
+            reserved: [0; 32],
         }
     }
 
@@ -95,6 +102,7 @@ mod tests {
             authority: Pubkey::default(),
             vault: Pubkey::default(),
             epoch,
+            created_ts: 0,
             bump: 0,
         })
     }

@@ -1,10 +1,12 @@
 use anchor_lang::prelude::*;
 
-use crate::{events::VaultUpdated, seeds::VAULT, vault_seeds, Vault, VaultStatus};
+use crate::{
+    error::HedgeVaultError, events::VaultUpdated, seeds::VAULT, validate, vault_seeds, Vault,
+    VaultStatus,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct UpdateVaultArgs {
-    pub description: Option<[u8; 64]>,
     pub performance_fee_bps: Option<u16>,
     pub management_fee_bps: Option<u16>,
     pub deposit_cap: Option<u64>,
@@ -35,10 +37,6 @@ impl<'info> UpdateVault<'info> {
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.validate_authority(authority.key())?;
 
-        if let Some(description) = args.description {
-            vault.description = description;
-        }
-
         // only touch fees when asked, so a status-only update never restarts a pending delay
         if args.performance_fee_bps.is_some() || args.management_fee_bps.is_some() {
             let now = Clock::get()?.unix_timestamp;
@@ -50,10 +48,17 @@ impl<'info> UpdateVault<'info> {
         }
 
         if let Some(min_deposit) = args.min_deposit {
+            validate!(min_deposit > 0, HedgeVaultError::InvalidMinimumAmount)?;
+
             vault.min_deposit = min_deposit;
         }
 
         if let Some(min_withdrawal_shares) = args.min_withdrawal_shares {
+            validate!(
+                min_withdrawal_shares > 0,
+                HedgeVaultError::InvalidMinimumAmount
+            )?;
+
             vault.min_withdrawal_shares = min_withdrawal_shares;
         }
 

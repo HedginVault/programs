@@ -17,7 +17,6 @@ use crate::{
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct InitializeVaultArgs {
     pub name: [u8; 32],
-    pub description: [u8; 64],
     pub performance_fee_bps: u16,
     pub management_fee_bps: u16,
     pub deposit_cap: u64,
@@ -124,6 +123,11 @@ impl<'info> InitializeVault<'info> {
             args.management_fee_bps <= MAX_BPS,
             HedgeVaultError::InvalidBasisPoints
         )?;
+        // a dust-sized first deposit leaves a share supply a donation can move arbitrarily
+        validate!(
+            args.min_deposit > 0 && args.min_withdrawal_shares > 0,
+            HedgeVaultError::InvalidMinimumAmount
+        )?;
 
         let clock = Clock::get()?;
         validate_deposit_mint_extensions(&deposit_mint.to_account_info(), clock.epoch)?;
@@ -135,7 +139,6 @@ impl<'info> InitializeVault<'info> {
             id: config.next_vault_id,
             authority: authority_key,
             name: args.name,
-            description: args.description,
             deposit_mint: deposit_mint.key(),
             share_mint: share_mint.key(),
             deposit_cap: args.deposit_cap,

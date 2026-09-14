@@ -121,6 +121,7 @@ impl<'info> MeteoraDlmmAddLiquidity<'info> {
 
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.validate_authority(authority.key())?;
+        vault.is_vault_operational()?;
 
         let position_key = position.key();
 

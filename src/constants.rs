@@ -33,3 +33,7 @@ pub const SECONDS_PER_YEAR: i64 = 31_536_000; // 365 days
 /// Delay before a manager fee increase takes effect, so depositors can exit first.
 #[constant]
 pub const FEE_INCREASE_DELAY: i64 = 604_800; // 7 days
+
+/// Max embedded Jupiter slippage accepted when [Config::max_slippage_bps] is unset (legacy zero).
+#[constant]
+pub const DEFAULT_MAX_SLIPPAGE_BPS: u16 = 300; // 3%

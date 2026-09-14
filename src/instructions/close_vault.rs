@@ -87,6 +87,12 @@ impl<'info> CloseVault<'info> {
             vault.unclaimed_manager_fee_shares == 0 && vault.unclaimed_platform_fee_shares == 0,
             HedgeVaultError::VaultHasUnclaimedFees
         )?;
+        // strategies hold positions owned by the vault PDA, closing first would strand them
+        validate!(
+            vault.open_strategy_count == 0,
+            HedgeVaultError::VaultHasOpenStrategies
+        )?;
+        validate!(vault.total_assets == 0, HedgeVaultError::VaultHasAssets)?;
 
         drop(vault);
 

@@ -1,19 +1,21 @@
 use anchor_lang::prelude::*;
 
 use crate::{
+    config_seeds,
     dlmm::{
         cpi::{accounts::InitializePosition2, initialize_position2},
         ID as dlmm_ID,
     },
     events::StrategyInitialized,
-    seeds::{STRATEGY, VAULT},
-    vault_seeds, NewStrategyArgs, Strategy, StrategyType, Vault,
+    seeds::{CONFIG, STRATEGY, VAULT},
+    vault_seeds, Config, NewStrategyArgs, Strategy, StrategyType, Vault,
 };
 
 #[derive(Accounts)]
 pub struct MeteoraDlmmInitializePosition<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
+    pub config: AccountLoader<'info, Config>,
     #[account(mut)]
     pub vault: AccountLoader<'info, Vault>,
     #[account(
@@ -46,6 +48,7 @@ impl<'info> MeteoraDlmmInitializePosition<'info> {
     ) -> Result<()> {
         let MeteoraDlmmInitializePosition {
             authority,
+            config,
             vault,
             strategy,
             position,
@@ -58,6 +61,13 @@ impl<'info> MeteoraDlmmInitializePosition<'info> {
 
         let vault_acc_info = vault.to_account_info();
 
+        let config_key = config.key();
+        let config = config.load()?;
+        let config_seeds = config_seeds!(config.bump);
+
+        Config::validate_address(config_seeds, config_key)?;
+        config.is_protocol_operational()?;
+
         let vault_key = vault.key();
         let mut vault = vault.load_mut()?;
         let vault_id = vault.id.to_le_bytes();
@@ -66,6 +76,7 @@ impl<'info> MeteoraDlmmInitializePosition<'info> {
 
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.validate_authority(authority.key())?;
+        vault.is_vault_operational()?;
 
         let now = Clock::get()?.unix_timestamp;
 
@@ -80,6 +91,7 @@ impl<'info> MeteoraDlmmInitializePosition<'info> {
         }));
 
         vault.increment_strategy_id()?;
+        vault.increment_open_strategies()?;
         drop(vault);
 
         emit!(StrategyInitialized {

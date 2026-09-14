@@ -68,6 +68,10 @@ pub mod hedge_vault {
         PauseProtocol::handler(ctx)
     }
 
+    pub fn pause_vault(ctx: Context<PauseVault>) -> Result<()> {
+        PauseVault::handler(ctx)
+    }
+
     // Pending admin
 
     pub fn accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {

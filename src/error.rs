@@ -17,6 +17,10 @@ pub enum HedgeVaultError {
     InvalidBasisPoints,
     #[msg("Invalid amount of remaining accounts passed")]
     InvalidRemainingAccounts,
+    #[msg("Instruction data is malformed")]
+    InvalidInstructionData,
+    #[msg("Minimum deposit and withdrawal amounts must be greater than zero")]
+    InvalidMinimumAmount,
 
     // Token & Balances
     #[msg("Invalid Token Account Mint")]
@@ -25,6 +29,8 @@ pub enum HedgeVaultError {
     InvalidTokenAccountOwner,
     #[msg("Insufficient funds")]
     InsufficientFunds,
+    #[msg("Token program is not a supported SPL token program")]
+    InvalidTokenProgram,
 
     // Config
     #[msg("Config address does not match")]
@@ -73,6 +79,10 @@ pub enum HedgeVaultError {
     VaultHasPendingRequests,
     #[msg("Vault cannot be closed until all fee shares are claimed")]
     VaultHasUnclaimedFees,
+    #[msg("Vault cannot be closed until all strategies are closed")]
+    VaultHasOpenStrategies,
+    #[msg("Vault cannot be closed until its total assets are zero")]
+    VaultHasAssets,
     #[msg("Shares amount must be greater than zero")]
     InvalidSharesAmount,
     #[msg("Unclaimed fee shares is 0")]
@@ -121,10 +131,18 @@ pub enum HedgeVaultError {
     InvalidStrategyType,
     #[msg("Target mint does not match strategy target mint")]
     InvalidTargetMint,
+    #[msg("Strategy mint cannot be the vault deposit or share mint")]
+    InvalidStrategyMint,
 
     // Jupiter
     #[msg("Target mint of token account does not match")]
     InvalidTargetMintTokenAccount,
+    #[msg("Source and destination mint of a swap must differ")]
+    InvalidSwapMints,
+    #[msg("Swap slippage exceeds the protocol maximum")]
+    SlippageExceedsCap,
+    #[msg("Swap moved less than the quote and slippage cap allow")]
+    SwapOutputBelowMinimum,
 
     // Meteora
     #[msg("Position address does not match")]

@@ -128,6 +128,7 @@ impl<'info> MeteoraDlmmRemoveLiquidity<'info> {
 
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.validate_authority(authority.key())?;
+        vault.is_vault_withdrawable()?;
 
         let position_key = position.key();
 

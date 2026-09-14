@@ -109,6 +109,7 @@ impl<'info> RequestDeposit<'info> {
                 authority: depositor_key,
                 vault: vault_key,
                 epoch,
+                created_ts: now,
                 bump: ctx.bumps.deposit_request,
             }));
         } else {

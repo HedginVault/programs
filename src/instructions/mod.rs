@@ -55,6 +55,9 @@ pub use override_nav::*;
 pub mod pause_protocol;
 pub use pause_protocol::*;
 
+pub mod pause_vault;
+pub use pause_vault::*;
+
 pub mod reject_deposit_request;
 pub use reject_deposit_request::*;
 

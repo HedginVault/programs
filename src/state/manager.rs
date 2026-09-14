@@ -14,6 +14,8 @@ pub struct Manager {
     /// Authority allowed to create vaults.
     pub authority: Pubkey,
     pub bump: u8,
+    /// Reserved for future fields.
+    pub reserved: [u8; 32],
 }
 
 impl Manager {
@@ -21,6 +23,7 @@ impl Manager {
         Self {
             authority: args.authority,
             bump: args.bump,
+            reserved: [0; 32],
         }
     }
 
