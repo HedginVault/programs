@@ -2,7 +2,11 @@
   "license": "ISC",
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "app:install": "yarn --cwd app install",
+    "app:sync-idl": "yarn --cwd app sync-idl",
+    "app:dev": "yarn --cwd app dev",
+    "app:build": "yarn --cwd app build"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
