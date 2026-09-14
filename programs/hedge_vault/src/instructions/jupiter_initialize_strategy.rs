@@ -56,7 +56,7 @@ impl<'info> JupiterInitializeStrategy<'info> {
         vault.validate_authority(authority.key())?;
         vault.is_vault_operational()?;
 
-        // close_strategy closes the vault ATA of the target mint, which must never be the
+        // vault_close_strategy closes the vault ATA of the target mint, which must never be the
         // deposit mint account or the share mint the vault cannot recreate
         validate!(
             destination_mint.key() != vault.deposit_mint

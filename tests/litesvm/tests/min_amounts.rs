@@ -7,24 +7,24 @@ fn enforces_minimum_request_sizes() {
     let mut args = TestContext::vault_args();
     args.min_deposit = 10 * USDC;
     args.min_withdrawal_shares = 50 * USDC;
-    let (v, result) = ctx.initialize_vault(mint, TOKEN_PROGRAM, args);
+    let (v, result) = ctx.vault_initialize(mint, TOKEN_PROGRAM, args);
     result.unwrap();
 
     let user = ctx.new_user();
     ctx.fund(&user.pubkey(), &v.deposit_mint, &v.deposit_token_program, 1_000 * USDC);
 
-    assert_error(ctx.request_deposit(&v, &user, USDC), HedgeVaultError::DepositBelowMinimum);
-    ctx.request_deposit(&v, &user, 100 * USDC).unwrap();
+    assert_error(ctx.deposit_request_create(&v, &user, USDC), HedgeVaultError::DepositBelowMinimum);
+    ctx.deposit_request_create(&v, &user, 100 * USDC).unwrap();
     ctx.warp_days(1);
-    ctx.update_nav(&v, 0).unwrap();
-    ctx.resolve_deposit_request(&v, &user.pubkey()).unwrap();
+    ctx.nav_update(&v, 0).unwrap();
+    ctx.deposit_request_resolve(&v, &user.pubkey()).unwrap();
 
     assert_error(
-        ctx.request_withdrawal(&v, &user, 40 * USDC),
+        ctx.withdrawal_request_create(&v, &user, 40 * USDC),
         HedgeVaultError::WithdrawalBelowMinimum,
     );
     // full balance is always allowed
-    ctx.request_withdrawal(&v, &user, 100 * USDC).unwrap();
+    ctx.withdrawal_request_create(&v, &user, 100 * USDC).unwrap();
 }
 
 #[test]
@@ -34,12 +34,12 @@ fn initialize_vault_rejects_a_zero_minimum() {
 
     let mut args = TestContext::vault_args();
     args.min_deposit = 0;
-    let (_, result) = ctx.initialize_vault(mint, TOKEN_PROGRAM, args);
+    let (_, result) = ctx.vault_initialize(mint, TOKEN_PROGRAM, args);
     assert_error(result, HedgeVaultError::InvalidMinimumAmount);
 
     let mut args = TestContext::vault_args();
     args.min_withdrawal_shares = 0;
-    let (_, result) = ctx.initialize_vault(mint, TOKEN_PROGRAM, args);
+    let (_, result) = ctx.vault_initialize(mint, TOKEN_PROGRAM, args);
     assert_error(result, HedgeVaultError::InvalidMinimumAmount);
 }
 
@@ -50,11 +50,11 @@ fn update_vault_rejects_a_zero_minimum() {
 
     let mut args = TestContext::update_vault_args();
     args.min_deposit = Some(0);
-    assert_error(ctx.update_vault(&v, args), HedgeVaultError::InvalidMinimumAmount);
+    assert_error(ctx.vault_update(&v, args), HedgeVaultError::InvalidMinimumAmount);
 
     let mut args = TestContext::update_vault_args();
     args.min_withdrawal_shares = Some(0);
-    assert_error(ctx.update_vault(&v, args), HedgeVaultError::InvalidMinimumAmount);
+    assert_error(ctx.vault_update(&v, args), HedgeVaultError::InvalidMinimumAmount);
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn manager_updates_minimums() {
     let mut args = TestContext::update_vault_args();
     args.min_deposit = Some(5 * USDC);
     args.min_withdrawal_shares = Some(7 * USDC);
-    ctx.update_vault(&v, args).unwrap();
+    ctx.vault_update(&v, args).unwrap();
 
     let vault = ctx.vault(&v.address);
     assert_eq!(vault.min_deposit, 5 * USDC);

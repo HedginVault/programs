@@ -11,7 +11,7 @@ pub const VAULT_VERSION: u8 = 1;
 #[constant]
 pub const STRATEGY_VERSION: u8 = 1;
 
-/// Size of the deployed v1 config account, the only layout `migrate_config` accepts.
+/// Size of the deployed v1 config account, the only layout `config_migrate` accepts.
 pub const CONFIG_V1_LEN: usize = 160;
 
 /// Precision of NAV per share, 1e9 = 1 deposit mint unit per share.

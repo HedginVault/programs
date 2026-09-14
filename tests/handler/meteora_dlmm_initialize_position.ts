@@ -1,6 +1,6 @@
 import DLMM from "@meteora-ag/dlmm";
 import { Keypair } from "@solana/web3.js";
-import { DLMM_EVENT_AUTHORITY } from "../../utils/constants";
+import { DLMM_EVENT_AUTHORITY, DLMM_PROGRAM_ID } from "../../utils/constants";
 import { getConfigPda, getStrategyPda } from "../../utils/pda";
 import { LB_PAIR, VAULT } from "./params";
 import { connection, log, program, run, wallet } from "./setup";
@@ -28,6 +28,8 @@ describe("hedge_vault", () => {
         position: position.publicKey,
         lbPair: LB_PAIR,
         eventAuthority: DLMM_EVENT_AUTHORITY,
+        // the idl carries no address constraint for this account, anchor cannot resolve it
+        dlmmProgram: DLMM_PROGRAM_ID,
       })
       .instruction();
 

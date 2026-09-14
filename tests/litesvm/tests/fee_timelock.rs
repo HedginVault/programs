@@ -7,7 +7,7 @@ fn manager_fee_increase_waits_for_the_delay() {
 
     let mut args = TestContext::update_vault_args();
     args.performance_fee_bps = Some(2_000);
-    ctx.update_vault(&v, args).unwrap();
+    ctx.vault_update(&v, args).unwrap();
 
     let vault = ctx.vault(&v.address);
     assert_eq!(vault.performance_fee_bps, 0);
@@ -15,7 +15,7 @@ fn manager_fee_increase_waits_for_the_delay() {
     assert_eq!(vault.fee_effective_ts, START_TS + hedge_vault::FEE_INCREASE_DELAY);
 
     ctx.warp_days(7);
-    ctx.update_nav(&v, 0).unwrap();
+    ctx.nav_update(&v, 0).unwrap();
 
     let vault = ctx.vault(&v.address);
     assert_eq!(vault.performance_fee_bps, 2_000);

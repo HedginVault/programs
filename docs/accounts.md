@@ -26,13 +26,13 @@ erDiagram
 
     CONFIG {
         Pubkey admin "config + manager whitelist authority"
-        Pubkey nav_updater "may call update_nav"
+        Pubkey nav_updater "may call nav_update"
         Pubkey treasury_authority "may claim platform fee shares"
         Pubkey guardian "may only pause"
         u64 next_vault_id "auto-increment"
         u16 platform_performance_fee_bps
         u16 platform_management_fee_bps "annualized"
-        u16 max_nav_deviation_bps "per update_nav"
+        u16 max_nav_deviation_bps "per nav_update"
         u16 max_epoch_outflow_bps "per epoch"
         ProtocolStatus status
         u8 bump
@@ -140,33 +140,33 @@ erDiagram
 | | |
 | --- | --- |
 | Seeds | `["config"]` |
-| Layout | zero-copy, 352 bytes (v2; the v1 account deployed at 160 bytes is grown once by `migrate_config`) |
-| Created by | `initialize_config` (admin = signer) |
-| Mutated by | `update_config`, `accept_admin`, `pause_protocol`, `migrate_config`, `initialize_vault` (`next_vault_id`) |
+| Layout | zero-copy, 352 bytes (v2; the v1 account deployed at 160 bytes is grown once by `config_migrate`) |
+| Created by | `config_initialize` (admin = signer) |
+| Mutated by | `config_update`, `admin_accept`, `config_pause`, `config_migrate`, `vault_initialize` (`next_vault_id`) |
 | Closed by | never |
 
 | Field | Type | Description |
 | --- | --- | --- |
 | `admin` | `Pubkey` | Can update config and add/remove managers. |
-| `nav_updater` | `Pubkey` | Only signer allowed to call `update_nav`. |
-| `treasury_authority` | `Pubkey` | Only signer allowed to call `claim_platform_fee`. |
-| `guardian` | `Pubkey` | Only signer allowed to call `pause_protocol`. Cannot unpause or change anything else. |
-| `next_vault_id` | `u64` | Incremented on every `initialize_vault`; becomes `vault.id`. |
+| `nav_updater` | `Pubkey` | Only signer allowed to call `nav_update`. |
+| `treasury_authority` | `Pubkey` | Only signer allowed to call `config_claim_platform_fee`. |
+| `guardian` | `Pubkey` | Only signer allowed to call `config_pause`. Cannot unpause or change anything else. |
+| `next_vault_id` | `u64` | Incremented on every `vault_initialize`; becomes `vault.id`. |
 | `platform_performance_fee_bps` | `u16` | Platform cut of profit above the vault high water mark. |
 | `platform_management_fee_bps` | `u16` | Annualized platform fee on total assets, prorated by seconds since last NAV. |
-| `max_nav_deviation_bps` | `u16` | `update_nav` is rejected if NAV per share moves more than this from the previous value. `override_nav` (admin) ignores it. |
+| `max_nav_deviation_bps` | `u16` | `nav_update` is rejected if NAV per share moves more than this from the previous value. `nav_override` (admin) ignores it. |
 | `max_epoch_outflow_bps` | `u16` | Withdrawal resolutions fail once payouts since the last NAV update exceed this share of total assets. |
 | `status` | `ProtocolStatus` | `Normal` (0), `Paused` (1), `ReduceOnly` (2). Starts `Paused`. |
 | `bump` | `u8` | PDA bump. |
-| `version` | `u8` | Layout version, currently 2. `migrate_config` sets it after growing a v1 account. |
-| `pending_admin` | `Pubkey` | Nominated by `update_config`; becomes `admin` when it signs `accept_admin`. `Pubkey::default()` when no transfer is pending. Account bytes 168–199. |
+| `version` | `u8` | Layout version, currently 2. `config_migrate` sets it after growing a v1 account. |
+| `pending_admin` | `Pubkey` | Nominated by `config_update`; becomes `admin` when it signs `admin_accept`. `Pubkey::default()` when no transfer is pending. Account bytes 168–199. |
 | `reserve` | `[u64; 19]` | 152 zeroed bytes for future fields. Appended fields treat 0 as "not set". |
 
-Status gates: `Normal` required for deposits, vault creation, strategy execute/exit and deposit resolution. `Paused` blocks withdrawal requests and resolutions too. `update_nav`, `override_nav` and fee claims are never gated.
+Status gates: `Normal` required for deposits, vault creation, strategy execute/exit and deposit resolution. `Paused` blocks withdrawal requests and resolutions too. `nav_update`, `nav_override` and fee claims are never gated.
 
-Deposit mint rules (`initialize_vault`, rechecked on every `request_deposit`): Token-2022 mints are rejected if they carry a non-zero transfer fee, a transfer hook program, NonTransferable, frozen-by-default accounts, ConfidentialMintBurn, or any extension type the program cannot parse. PermanentDelegate is allowed and means the issuer can move vault balances.
+Deposit mint rules (`vault_initialize`, rechecked on every `deposit_request_create`): Token-2022 mints are rejected if they carry a non-zero transfer fee, a transfer hook program, NonTransferable, frozen-by-default accounts, ConfidentialMintBurn, or any extension type the program cannot parse. PermanentDelegate is allowed and means the issuer can move vault balances.
 
-NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both update paths), one update per epoch, deviation bound (`update_nav` only), fee must be below total assets.
+NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both update paths), one update per epoch, deviation bound (`nav_update` only), fee must be below total assets.
 
 ### Manager
 
@@ -174,12 +174,12 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | --- | --- |
 | Seeds | `["manager", authority]` |
 | Layout | borsh, 41 bytes |
-| Created by | `add_manager` (admin) |
-| Closed by | `remove_manager` (admin); existing vaults keep working |
+| Created by | `config_add_manager` (admin) |
+| Closed by | `config_remove_manager` (admin); existing vaults keep working |
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `authority` | `Pubkey` | Wallet allowed to call `initialize_vault`. |
+| `authority` | `Pubkey` | Wallet allowed to call `vault_initialize`. |
 | `bump` | `u8` | PDA bump. |
 
 ### Vault
@@ -188,9 +188,9 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | --- | --- |
 | Seeds | `["vault", id (u64 LE)]` |
 | Layout | zero-copy, 424 bytes (89 reserved), version 1 |
-| Created by | `initialize_vault` (manager) |
-| Mutated by | `update_vault`, `update_nav`, `override_nav`, request/cancel/resolve/reject, fee claims, strategy init |
-| Closed by | `close_vault` when share supply, pending totals and unclaimed fee shares are all 0 |
+| Created by | `vault_initialize` (manager) |
+| Mutated by | `vault_update`, `nav_update`, `nav_override`, request/cancel/resolve/reject, fee claims, strategy init |
+| Closed by | `vault_close` when share supply, pending totals and unclaimed fee shares are all 0 |
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -200,9 +200,9 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | `reserved_keys` | `[u8; 64]` | Reserved for two future `Pubkey` fields (e.g. `pending_authority`, `delegate`). Metadata beyond `name` lives off-chain. |
 | `deposit_mint` | `Pubkey` | Only mint accepted for deposits and paid on withdrawals. |
 | `share_mint` | `Pubkey` | Tokenized share mint, see below. |
-| `deposit_cap` | `u64` | `total_assets + pending_deposits` must stay below this on `request_deposit`. |
-| `min_deposit` | `u64` | `request_deposit` rejects smaller amounts. 0 disables. |
-| `min_withdrawal_shares` | `u64` | `request_withdrawal` rejects fewer shares unless the request is the withdrawer's full share balance. 0 disables. |
+| `deposit_cap` | `u64` | `total_assets + pending_deposits` must stay below this on `deposit_request_create`. |
+| `min_deposit` | `u64` | `deposit_request_create` rejects smaller amounts. 0 disables. |
+| `min_withdrawal_shares` | `u64` | `withdrawal_request_create` rejects fewer shares unless the request is the withdrawer's full share balance. 0 disables. |
 | `total_assets` | `u64` | AUM posted by the updater. `+amount` on deposit resolve, `-amount` on withdrawal resolve so NAV stays constant between updates. |
 | `nav_per_share` | `u64` | Value of one share in deposit mint, scaled by 1e9. Starts at 1e9. |
 | `high_water_mark` | `u64` | Highest `nav_per_share` after fees. Performance fee only on NAV above it. |
@@ -210,19 +210,19 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | `last_nav_ts` | `i64` | Timestamp of last update, start of the management fee accrual window. |
 | `pending_deposits` | `u64` | Mirrors the deposit escrow balance. |
 | `pending_withdrawal_shares` | `u64` | Mirrors the share escrow balance. |
-| `unclaimed_manager_fee_shares` | `u64` | Shares owed to the manager, counted as supply in NAV math until minted by `claim_manager_fee`. |
-| `unclaimed_platform_fee_shares` | `u64` | Same for the platform, minted by `claim_platform_fee`. |
-| `epoch_outflow` | `u64` | Deposit mint paid to withdrawals since the last NAV update. Reset to 0 by `update_nav` / `override_nav`. Cap is `(total_assets + epoch_outflow) * max_epoch_outflow_bps / 10_000`. |
+| `unclaimed_manager_fee_shares` | `u64` | Shares owed to the manager, counted as supply in NAV math until minted by `vault_claim_manager_fee`. |
+| `unclaimed_platform_fee_shares` | `u64` | Same for the platform, minted by `config_claim_platform_fee`. |
+| `epoch_outflow` | `u64` | Deposit mint paid to withdrawals since the last NAV update. Reset to 0 by `nav_update` / `nav_override`. Cap is `(total_assets + epoch_outflow) * max_epoch_outflow_bps / 10_000`. |
 | `next_strategy_id` | `u32` | Incremented on every strategy init. |
 | `performance_fee_bps` | `u16` | Manager cut of profit above high water mark. |
 | `management_fee_bps` | `u16` | Annualized manager fee on total assets. |
-| `pending_performance_fee_bps`, `pending_management_fee_bps` | `u16` | Fee pair scheduled by `update_vault` when either fee increases. |
-| `fee_effective_ts` | `i64` | `update_nav` applies the pending pair once `now >= fee_effective_ts`, after charging the period at the old rate. Decreases apply immediately. 0 = nothing pending. |
+| `pending_performance_fee_bps`, `pending_management_fee_bps` | `u16` | Fee pair scheduled by `vault_update` when either fee increases. |
+| `fee_effective_ts` | `i64` | `nav_update` applies the pending pair once `now >= fee_effective_ts`, after charging the period at the old rate. Decreases apply immediately. 0 = nothing pending. |
 | `status` | `VaultStatus` | `Normal` (0), `Paused` (1), `ReduceOnly` (2). Starts `Normal`. |
 | `bump` | `u8` | PDA bump. |
 | `version` | `u8` | Layout version, currently 1. |
 
-Derived value used by `update_nav`: `virtual_supply = share_mint.supply + unclaimed_manager_fee_shares + unclaimed_platform_fee_shares`.
+Derived value used by `nav_update`: `virtual_supply = share_mint.supply + unclaimed_manager_fee_shares + unclaimed_platform_fee_shares`.
 
 ### Vault-owned token accounts
 
@@ -242,7 +242,7 @@ Derived value used by `update_nav`: `virtual_supply = share_mint.supply + unclai
 | Layout | borsh, 97 bytes, version 1 |
 | Created by | `jupiter_initialize_strategy`, `meteora_dlmm_initialize_position` (manager) |
 | Mutated by | `jupiter_swap`, `meteora_dlmm_*` liquidity and claim fee actions (`last_action_ts` only) |
-| Closed by | `close_strategy`; also closes the protocol account if it is empty |
+| Closed by | `vault_close_strategy`; also closes the protocol account if it is empty |
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -269,9 +269,9 @@ No amounts are stored. Utilization is read from the protocol accounts and token 
 | --- | --- |
 | Seeds | `["deposit_request", vault, depositor]` (one per user per vault) |
 | Layout | borsh, 89 bytes |
-| Created by | `request_deposit` (depositor pays rent) |
-| Mutated by | `request_deposit` again in the same epoch (amount accumulates) |
-| Closed by | `cancel_deposit_request` (depositor, only while `vault.nav_epoch <= epoch` or vault NAV is 0), `resolve_deposit_request` (anyone, only when `vault.nav_epoch > epoch`) or `reject_deposit_request` (admin, any time before resolution); rent returns to `authority` |
+| Created by | `deposit_request_create` (depositor pays rent) |
+| Mutated by | `deposit_request_create` again in the same epoch (amount accumulates) |
+| Closed by | `deposit_request_cancel` (depositor, only while `vault.nav_epoch <= epoch` or vault NAV is 0), `deposit_request_resolve` (anyone, only when `vault.nav_epoch > epoch`) or `deposit_request_reject` (admin, any time before resolution); rent returns to `authority` |
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -289,9 +289,9 @@ On resolve: `shares = amount * 1e9 / vault.nav_per_share`. Fails while NAV is 0 
 | --- | --- |
 | Seeds | `["withdrawal_request", vault, withdrawer]` (one per user per vault) |
 | Layout | borsh, 89 bytes |
-| Created by | `request_withdrawal` (withdrawer pays rent) |
-| Mutated by | `request_withdrawal` again in the same epoch (shares accumulate) |
-| Closed by | `cancel_withdrawal_request` (withdrawer, only while `vault.nav_epoch <= epoch`), `resolve_withdrawal_request` (anyone, only when `vault.nav_epoch > epoch`) or `reject_withdrawal_request` (admin, any time before resolution); rent returns to `authority` |
+| Created by | `withdrawal_request_create` (withdrawer pays rent) |
+| Mutated by | `withdrawal_request_create` again in the same epoch (shares accumulate) |
+| Closed by | `withdrawal_request_cancel` (withdrawer, only while `vault.nav_epoch <= epoch`), `withdrawal_request_resolve` (anyone, only when `vault.nav_epoch > epoch`) or `withdrawal_request_reject` (admin, any time before resolution); rent returns to `authority` |
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -307,21 +307,21 @@ On resolve: `amount = shares * vault.nav_per_share / 1e9`, paid from the vault t
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending : request_* (epoch N)
-    Pending --> Pending : request_* again in epoch N
-    Pending --> [*] : cancel_* while no NAV newer than epoch N
-    Pending --> [*] : reject_* (admin)
-    Pending --> Resolvable : update_nav in a later epoch
-    Resolvable --> [*] : resolve_* (anyone)
-    Resolvable --> [*] : reject_* (admin)
-    Resolvable --> [*] : cancel_deposit_request while vault NAV is 0
+    [*] --> Pending : *_request_create (epoch N)
+    Pending --> Pending : *_request_create again in epoch N
+    Pending --> [*] : *_request_cancel while no NAV newer than epoch N
+    Pending --> [*] : *_request_reject (admin)
+    Pending --> Resolvable : nav_update in a later epoch
+    Resolvable --> [*] : *_request_resolve (anyone)
+    Resolvable --> [*] : *_request_reject (admin)
+    Resolvable --> [*] : deposit_request_cancel while vault NAV is 0
 ```
 
 ## NAV update per epoch
 
 ```mermaid
 flowchart TD
-    A[update_nav total_assets] --> A2{total_assets at least idle balance?}
+    A[nav_update total_assets] --> A2{total_assets at least idle balance?}
     A2 -- no --> X0[error TotalAssetsBelowIdleBalance]
     A2 -- yes --> B{epoch later than vault.nav_epoch?}
     B -- no --> X[error NavAlreadyUpdatedThisEpoch]
@@ -333,8 +333,8 @@ flowchart TD
     F --> G
     G --> H[nav = total_assets * 1e9 / supply + fee shares]
     H --> J{nav within max_nav_deviation_bps of previous?}
-    J -- no, update_nav --> X2[error NavDeviationExceeded, admin may override_nav]
-    J -- yes or override_nav --> I[store nav, hwm = max, epoch, ts, unclaimed += fee shares, epoch_outflow = 0]
+    J -- no, nav_update --> X2[error NavDeviationExceeded, admin may nav_override]
+    J -- yes or nav_override --> I[store nav, hwm = max, epoch, ts, unclaimed += fee shares, epoch_outflow = 0]
 ```
 
 ## Events
@@ -345,14 +345,14 @@ NAV updater never need to diff account snapshots.
 | Event | Emitted by | Key fields |
 | --- | --- | --- |
 | `ConfigInitialized`, `ConfigUpdated`, `ConfigMigrated`, `ProtocolPaused` | config instructions | authorities, fee and bound bps, status, version |
-| `AdminNominated`, `AdminAccepted` | `update_config`, `accept_admin` | admin, pending_admin, previous_admin |
-| `ManagerAdded`, `ManagerRemoved` | `add_manager`, `remove_manager` | authority |
+| `AdminNominated`, `AdminAccepted` | `config_update`, `admin_accept` | admin, pending_admin, previous_admin |
+| `ManagerAdded`, `ManagerRemoved` | `config_add_manager`, `config_remove_manager` | authority |
 | `VaultInitialized`, `VaultUpdated`, `VaultClosed` | vault instructions | vault, id, authority, mints, fees, cap, status |
-| `NavUpdated` | `update_nav`, `override_nav` | vault, epoch, total_assets, nav_per_share, high_water_mark, fee shares, `overridden` |
+| `NavUpdated` | `nav_update`, `nav_override` | vault, epoch, total_assets, nav_per_share, high_water_mark, fee shares, `overridden` |
 | `ManagerFeeClaimed`, `PlatformFeeClaimed` | fee claims | vault, authority, shares |
 | `DepositRequested`, `DepositCancelled`, `DepositResolved` | deposit flow | vault, authority, amount, pending_amount, epoch, shares, nav_per_share |
 | `WithdrawalRequested`, `WithdrawalCancelled`, `WithdrawalResolved` | withdrawal flow | vault, authority, shares, pending_shares, epoch, amount, nav_per_share |
-| `DepositRejected`, `WithdrawalRejected` | `reject_*_request` | vault, authority, amount or shares |
+| `DepositRejected`, `WithdrawalRejected` | `*_request_reject` | vault, authority, amount or shares |
 | `StrategyInitialized`, `StrategyClosed` | strategy lifecycle | vault, strategy, id, strategy_type |
 | `JupiterSwapped` | `jupiter_swap` | vault, strategy, source/destination mint, amount |
 | `MeteoraDlmmLiquidityAdded`, `MeteoraDlmmLiquidityRemoved` | DLMM liquidity | vault, strategy, position, amount_x/amount_y or bps_to_remove |

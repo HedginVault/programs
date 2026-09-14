@@ -9,13 +9,13 @@ fn close_vault_requires_every_strategy_to_be_closed() {
     ctx.jupiter_initialize_strategy(&v, &target_mint).unwrap();
     assert_eq!(ctx.vault(&v.address).open_strategy_count, 1);
 
-    assert_error(ctx.close_vault(&v), HedgeVaultError::VaultHasOpenStrategies);
+    assert_error(ctx.vault_close(&v), HedgeVaultError::VaultHasOpenStrategies);
 
     ctx.close_jupiter_strategy(&v, &v.address, &target_mint)
         .unwrap();
     assert_eq!(ctx.vault(&v.address).open_strategy_count, 0);
 
-    ctx.close_vault(&v).unwrap();
+    ctx.vault_close(&v).unwrap();
     assert!(ctx.svm.get_account(&v.address).is_none_or(|a| a.data.is_empty()));
 }
 
@@ -26,13 +26,13 @@ fn close_vault_requires_zero_total_assets() {
 
     // assets held outside the vault ATA are only visible through the posted NAV
     ctx.warp_days(1);
-    ctx.update_nav(&v, 50 * USDC).unwrap();
+    ctx.nav_update(&v, 50 * USDC).unwrap();
     assert_eq!(ctx.vault(&v.address).total_assets, 50 * USDC);
 
-    assert_error(ctx.close_vault(&v), HedgeVaultError::VaultHasAssets);
+    assert_error(ctx.vault_close(&v), HedgeVaultError::VaultHasAssets);
 
     // a final NAV of zero after the unwind is what makes the vault closable
     ctx.warp_days(1);
-    ctx.update_nav(&v, 0).unwrap();
-    ctx.close_vault(&v).unwrap();
+    ctx.nav_update(&v, 0).unwrap();
+    ctx.vault_close(&v).unwrap();
 }

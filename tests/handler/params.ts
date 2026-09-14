@@ -6,13 +6,13 @@ import { USDC_MINT } from "../../utils/constants";
 export const DEPOSIT_MINT = USDC_MINT;
 export const DEPOSIT_MINT_DECIMALS = 6;
 
-/// Existing vault, required by every handler after initialize_vault.
+/// Existing vault, required by every handler after vault_initialize.
 export const VAULT = new PublicKey("11111111111111111111111111111111");
 
-/// Manager wallet to whitelist with add_manager / remove_manager.
+/// Manager wallet to whitelist with config_add_manager / config_remove_manager.
 export const MANAGER_AUTHORITY = new PublicKey("11111111111111111111111111111111");
 
-/// Owner of a pending request for the resolve_* handlers.
+/// Owner of a pending request for the *_request_resolve handlers.
 export const REQUEST_AUTHORITY = new PublicKey("11111111111111111111111111111111");
 
 /// Jupiter swap strategy target.

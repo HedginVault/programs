@@ -19,8 +19,8 @@ use anchor_spl::{
     },
 };
 use hedge_vault::{
-    accounts, instruction, Config, DepositRequest, InitializeConfigArgs, InitializeVaultArgs,
-    UpdateConfigArgs, UpdateVaultArgs, Vault, WithdrawalRequest,
+    accounts, instruction, Config, DepositRequest, ConfigInitializeArgs, VaultInitializeArgs,
+    ConfigUpdateArgs, VaultUpdateArgs, Vault, WithdrawalRequest,
 };
 use litesvm::{types::TransactionResult, LiteSVM};
 use solana_sdk::{
@@ -151,14 +151,14 @@ impl TestContext {
         let mut ctx = Self { svm, admin };
         let admin = ctx.admin.pubkey();
 
-        let initialize_config = ix(
-            accounts::InitializeConfig {
+        let config_initialize = ix(
+            accounts::ConfigInitialize {
                 admin,
                 config: config_pda(),
                 system_program: system_program::ID,
             },
-            instruction::InitializeConfig {
-                args: InitializeConfigArgs {
+            instruction::ConfigInitialize {
+                args: ConfigInitializeArgs {
                     nav_updater: admin,
                     treasury_authority: admin,
                     guardian: admin,
@@ -170,23 +170,23 @@ impl TestContext {
                 },
             },
         );
-        ctx.send(&[initialize_config], &[]).unwrap();
+        ctx.send(&[config_initialize], &[]).unwrap();
 
         let mut unpause = Self::update_config_args();
         unpause.status = Some(ProtocolStatus::Normal);
-        ctx.update_config(unpause).unwrap();
+        ctx.config_update(unpause).unwrap();
 
-        let add_manager = ix(
-            accounts::AddManager {
+        let config_add_manager = ix(
+            accounts::ConfigAddManager {
                 admin,
                 config: config_pda(),
                 authority: admin,
                 manager: manager_pda(&admin),
                 system_program: system_program::ID,
             },
-            instruction::AddManager {},
+            instruction::ConfigAddManager {},
         );
-        ctx.send(&[add_manager], &[]).unwrap();
+        ctx.send(&[config_add_manager], &[]).unwrap();
 
         ctx
     }
@@ -306,8 +306,8 @@ impl TestContext {
 
     // Config
 
-    pub fn update_config_args() -> UpdateConfigArgs {
-        UpdateConfigArgs {
+    pub fn update_config_args() -> ConfigUpdateArgs {
+        ConfigUpdateArgs {
             pending_admin: None,
             nav_updater: None,
             treasury_authority: None,
@@ -321,32 +321,32 @@ impl TestContext {
         }
     }
 
-    pub fn update_config(&mut self, args: UpdateConfigArgs) -> TransactionResult {
+    pub fn config_update(&mut self, args: ConfigUpdateArgs) -> TransactionResult {
         let update = ix(
-            accounts::UpdateConfig {
+            accounts::ConfigUpdate {
                 admin: self.admin.pubkey(),
                 config: config_pda(),
             },
-            instruction::UpdateConfig { args },
+            instruction::ConfigUpdate { args },
         );
         self.send(&[update], &[])
     }
 
-    pub fn accept_admin(&mut self, signer: &Keypair) -> TransactionResult {
+    pub fn admin_accept(&mut self, signer: &Keypair) -> TransactionResult {
         let accept = ix(
-            accounts::AcceptAdmin {
+            accounts::AdminAccept {
                 pending_admin: signer.pubkey(),
                 config: config_pda(),
             },
-            instruction::AcceptAdmin {},
+            instruction::AdminAccept {},
         );
         self.send(&[accept], &[signer])
     }
 
     // Vault
 
-    pub fn vault_args() -> InitializeVaultArgs {
-        InitializeVaultArgs {
+    pub fn vault_args() -> VaultInitializeArgs {
+        VaultInitializeArgs {
             name: [0; 32],
             performance_fee_bps: 0,
             management_fee_bps: 0,
@@ -356,8 +356,8 @@ impl TestContext {
         }
     }
 
-    pub fn update_vault_args() -> UpdateVaultArgs {
-        UpdateVaultArgs {
+    pub fn update_vault_args() -> VaultUpdateArgs {
+        VaultUpdateArgs {
             performance_fee_bps: None,
             management_fee_bps: None,
             deposit_cap: None,
@@ -367,18 +367,18 @@ impl TestContext {
         }
     }
 
-    pub fn initialize_vault(
+    pub fn vault_initialize(
         &mut self,
         deposit_mint: Pubkey,
         deposit_token_program: Pubkey,
-        args: InitializeVaultArgs,
+        args: VaultInitializeArgs,
     ) -> (TestVault, TransactionResult) {
         let admin = self.admin.pubkey();
         let address = vault_pda(self.config().next_vault_id);
         let share_mint = share_mint_pda(&address);
 
         let initialize = ix(
-            accounts::InitializeVault {
+            accounts::VaultInitialize {
                 authority: admin,
                 config: config_pda(),
                 manager: manager_pda(&admin),
@@ -393,7 +393,7 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 associated_token_program: anchor_spl::associated_token::ID,
             },
-            instruction::InitializeVault { args },
+            instruction::VaultInitialize { args },
         );
         let result = self.send(&[initialize], &[]);
 
@@ -409,25 +409,25 @@ impl TestContext {
     /// Vault with a fresh SPL Token deposit mint and default args.
     pub fn setup_vault(&mut self) -> TestVault {
         let mint = self.create_mint(&TOKEN_PROGRAM, None);
-        let (vault, result) = self.initialize_vault(mint, TOKEN_PROGRAM, Self::vault_args());
+        let (vault, result) = self.vault_initialize(mint, TOKEN_PROGRAM, Self::vault_args());
         result.unwrap();
         vault
     }
 
-    pub fn update_vault(&mut self, v: &TestVault, args: UpdateVaultArgs) -> TransactionResult {
+    pub fn vault_update(&mut self, v: &TestVault, args: VaultUpdateArgs) -> TransactionResult {
         let update = ix(
-            accounts::UpdateVault {
+            accounts::VaultUpdate {
                 authority: self.admin.pubkey(),
                 vault: v.address,
             },
-            instruction::UpdateVault { args },
+            instruction::VaultUpdate { args },
         );
         self.send(&[update], &[])
     }
 
-    pub fn update_nav(&mut self, v: &TestVault, total_assets: u64) -> TransactionResult {
+    pub fn nav_update(&mut self, v: &TestVault, total_assets: u64) -> TransactionResult {
         let update = ix(
-            accounts::UpdateNav {
+            accounts::NavUpdate {
                 nav_updater: self.admin.pubkey(),
                 config: config_pda(),
                 vault: v.address,
@@ -436,17 +436,17 @@ impl TestContext {
                 vault_token_account: ata(&v.address, &v.deposit_mint, &v.deposit_token_program),
                 deposit_mint_token_program: v.deposit_token_program,
             },
-            instruction::UpdateNav { total_assets },
+            instruction::NavUpdate { total_assets },
         );
         self.send(&[update], &[])
     }
 
     // Requests
 
-    pub fn request_deposit(&mut self, v: &TestVault, user: &Keypair, amount: u64) -> TransactionResult {
+    pub fn deposit_request_create(&mut self, v: &TestVault, user: &Keypair, amount: u64) -> TransactionResult {
         let depositor = user.pubkey();
         let request = ix(
-            accounts::RequestDeposit {
+            accounts::DepositRequestCreate {
                 depositor,
                 config: config_pda(),
                 vault: v.address,
@@ -461,15 +461,15 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 associated_token_program: anchor_spl::associated_token::ID,
             },
-            instruction::RequestDeposit { amount },
+            instruction::DepositRequestCreate { amount },
         );
         self.send(&[request], &[user])
     }
 
-    pub fn cancel_deposit_request(&mut self, v: &TestVault, user: &Keypair) -> TransactionResult {
+    pub fn deposit_request_cancel(&mut self, v: &TestVault, user: &Keypair) -> TransactionResult {
         let depositor = user.pubkey();
         let cancel = ix(
-            accounts::CancelDepositRequest {
+            accounts::DepositRequestCancel {
                 depositor,
                 vault: v.address,
                 deposit_request: deposit_request_pda(&v.address, &depositor),
@@ -479,14 +479,14 @@ impl TestContext {
                 deposit_mint_token_program: v.deposit_token_program,
                 system_program: system_program::ID,
             },
-            instruction::CancelDepositRequest {},
+            instruction::DepositRequestCancel {},
         );
         self.send(&[cancel], &[user])
     }
 
-    pub fn resolve_deposit_request(&mut self, v: &TestVault, depositor: &Pubkey) -> TransactionResult {
+    pub fn deposit_request_resolve(&mut self, v: &TestVault, depositor: &Pubkey) -> TransactionResult {
         let resolve = ix(
-            accounts::ResolveDepositRequest {
+            accounts::DepositRequestResolve {
                 resolver: self.admin.pubkey(),
                 config: config_pda(),
                 vault: v.address,
@@ -501,15 +501,15 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 system_program: system_program::ID,
             },
-            instruction::ResolveDepositRequest {},
+            instruction::DepositRequestResolve {},
         );
         self.send(&[resolve], &[])
     }
 
-    pub fn request_withdrawal(&mut self, v: &TestVault, user: &Keypair, shares: u64) -> TransactionResult {
+    pub fn withdrawal_request_create(&mut self, v: &TestVault, user: &Keypair, shares: u64) -> TransactionResult {
         let withdrawer = user.pubkey();
         let request = ix(
-            accounts::RequestWithdrawal {
+            accounts::WithdrawalRequestCreate {
                 withdrawer,
                 config: config_pda(),
                 vault: v.address,
@@ -524,14 +524,14 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 associated_token_program: anchor_spl::associated_token::ID,
             },
-            instruction::RequestWithdrawal { shares },
+            instruction::WithdrawalRequestCreate { shares },
         );
         self.send(&[request], &[user])
     }
 
-    pub fn resolve_withdrawal_request(&mut self, v: &TestVault, withdrawer: &Pubkey) -> TransactionResult {
+    pub fn withdrawal_request_resolve(&mut self, v: &TestVault, withdrawer: &Pubkey) -> TransactionResult {
         let resolve = ix(
-            accounts::ResolveWithdrawalRequest {
+            accounts::WithdrawalRequestResolve {
                 resolver: self.admin.pubkey(),
                 config: config_pda(),
                 vault: v.address,
@@ -546,15 +546,15 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 system_program: system_program::ID,
             },
-            instruction::ResolveWithdrawalRequest {},
+            instruction::WithdrawalRequestResolve {},
         );
         self.send(&[resolve], &[])
     }
 
-    pub fn cancel_withdrawal_request(&mut self, v: &TestVault, user: &Keypair) -> TransactionResult {
+    pub fn withdrawal_request_cancel(&mut self, v: &TestVault, user: &Keypair) -> TransactionResult {
         let withdrawer = user.pubkey();
         let cancel = ix(
-            accounts::CancelWithdrawalRequest {
+            accounts::WithdrawalRequestCancel {
                 withdrawer,
                 vault: v.address,
                 withdrawal_request: withdrawal_request_pda(&v.address, &withdrawer),
@@ -564,7 +564,7 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 system_program: system_program::ID,
             },
-            instruction::CancelWithdrawalRequest {},
+            instruction::WithdrawalRequestCancel {},
         );
         self.send(&[cancel], &[user])
     }
@@ -572,10 +572,10 @@ impl TestContext {
     // Fees
 
     /// Mints the manager fee shares into the admin's share ATA (the admin is the vault manager).
-    pub fn claim_manager_fee(&mut self, v: &TestVault) -> TransactionResult {
+    pub fn vault_claim_manager_fee(&mut self, v: &TestVault) -> TransactionResult {
         let admin = self.admin.pubkey();
         let claim = ix(
-            accounts::ClaimManagerFee {
+            accounts::VaultClaimManagerFee {
                 authority: admin,
                 vault: v.address,
                 share_mint: v.share_mint,
@@ -584,16 +584,16 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 associated_token_program: anchor_spl::associated_token::ID,
             },
-            instruction::ClaimManagerFee {},
+            instruction::VaultClaimManagerFee {},
         );
         self.send(&[claim], &[])
     }
 
     /// Mints the platform fee shares into the admin's share ATA (the admin is the treasury authority).
-    pub fn claim_platform_fee(&mut self, v: &TestVault) -> TransactionResult {
+    pub fn config_claim_platform_fee(&mut self, v: &TestVault) -> TransactionResult {
         let admin = self.admin.pubkey();
         let claim = ix(
-            accounts::ClaimPlatformFee {
+            accounts::ConfigClaimPlatformFee {
                 treasury_authority: admin,
                 config: config_pda(),
                 vault: v.address,
@@ -603,7 +603,7 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 associated_token_program: anchor_spl::associated_token::ID,
             },
-            instruction::ClaimPlatformFee {},
+            instruction::ConfigClaimPlatformFee {},
         );
         self.send(&[claim], &[])
     }
@@ -611,14 +611,14 @@ impl TestContext {
     // Admin reject
 
     /// `signer` defaults to the admin.
-    pub fn reject_deposit_request(
+    pub fn deposit_request_reject(
         &mut self,
         v: &TestVault,
         depositor: &Pubkey,
         signer: Option<&Keypair>,
     ) -> TransactionResult {
         let reject = ix(
-            accounts::RejectDepositRequest {
+            accounts::DepositRequestReject {
                 admin: signer.map_or(self.admin.pubkey(), |s| s.pubkey()),
                 config: config_pda(),
                 vault: v.address,
@@ -630,21 +630,21 @@ impl TestContext {
                 deposit_mint_token_program: v.deposit_token_program,
                 system_program: system_program::ID,
             },
-            instruction::RejectDepositRequest {},
+            instruction::DepositRequestReject {},
         );
         let signers: Vec<&Keypair> = signer.into_iter().collect();
         self.send(&[reject], &signers)
     }
 
     /// `signer` defaults to the admin.
-    pub fn reject_withdrawal_request(
+    pub fn withdrawal_request_reject(
         &mut self,
         v: &TestVault,
         withdrawer: &Pubkey,
         signer: Option<&Keypair>,
     ) -> TransactionResult {
         let reject = ix(
-            accounts::RejectWithdrawalRequest {
+            accounts::WithdrawalRequestReject {
                 admin: signer.map_or(self.admin.pubkey(), |s| s.pubkey()),
                 config: config_pda(),
                 vault: v.address,
@@ -656,7 +656,7 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 system_program: system_program::ID,
             },
-            instruction::RejectWithdrawalRequest {},
+            instruction::WithdrawalRequestReject {},
         );
         let signers: Vec<&Keypair> = signer.into_iter().collect();
         self.send(&[reject], &signers)
@@ -664,21 +664,21 @@ impl TestContext {
 
     // Vault status
 
-    pub fn pause_vault(&mut self, v: &TestVault) -> TransactionResult {
+    pub fn vault_pause(&mut self, v: &TestVault) -> TransactionResult {
         let pause = ix(
-            accounts::PauseVault {
+            accounts::VaultPause {
                 guardian: self.admin.pubkey(),
                 config: config_pda(),
                 vault: v.address,
             },
-            instruction::PauseVault {},
+            instruction::VaultPause {},
         );
         self.send(&[pause], &[])
     }
 
-    pub fn close_vault(&mut self, v: &TestVault) -> TransactionResult {
+    pub fn vault_close(&mut self, v: &TestVault) -> TransactionResult {
         let close = ix(
-            accounts::CloseVault {
+            accounts::VaultClose {
                 authority: self.admin.pubkey(),
                 vault: v.address,
                 deposit_mint: v.deposit_mint,
@@ -690,7 +690,7 @@ impl TestContext {
                 share_token_program: TOKEN_PROGRAM,
                 system_program: system_program::ID,
             },
-            instruction::CloseVault {},
+            instruction::VaultClose {},
         );
         self.send(&[close], &[])
     }
@@ -725,14 +725,14 @@ impl TestContext {
         target_mint: &Pubkey,
     ) -> TransactionResult {
         let mut close = ix(
-            accounts::CloseStrategy {
+            accounts::VaultCloseStrategy {
                 authority: self.admin.pubkey(),
                 config: config_pda(),
                 vault: v.address,
                 strategy: strategy_pda(strategy_vault, target_mint),
                 system_program: system_program::ID,
             },
-            instruction::CloseStrategy {},
+            instruction::VaultCloseStrategy {},
         );
         close.accounts.push(AccountMeta::new(
             ata(&v.address, target_mint, &TOKEN_PROGRAM),

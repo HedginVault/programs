@@ -71,7 +71,7 @@ fn paused_vault_blocks_a_new_strategy() {
     let mut ctx = TestContext::new();
     let (v, target_mint) = vault_and_target(&mut ctx);
 
-    ctx.pause_vault(&v).unwrap();
+    ctx.vault_pause(&v).unwrap();
 
     assert_error(
         ctx.jupiter_initialize_strategy(&v, &target_mint),
@@ -86,7 +86,7 @@ fn paused_protocol_blocks_a_new_strategy() {
 
     let mut args = TestContext::update_config_args();
     args.status = Some(ProtocolStatus::Paused);
-    ctx.update_config(args).unwrap();
+    ctx.config_update(args).unwrap();
 
     assert_error(
         ctx.jupiter_initialize_strategy(&v, &target_mint),

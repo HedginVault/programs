@@ -8,35 +8,32 @@ withdrawals are requests resolved at the next posted NAV.
 Docs: [design spec](docs/superpowers/specs/2026-09-13-hedge-vault-design.md) ·
 [account data model](docs/accounts.md) ·
 [architecture evolution](docs/architecture-evolution.md) ·
-drafts: [composability](docs/drafts/composability.md) ·
-[adapters](docs/drafts/adapters.md) ·
-[hooks](docs/drafts/hooks.md)
 
 ## Flows
 
 **Admin**
-`initialize_config` → `update_config` / `add_manager` / `remove_manager` / `claim_platform_fee` / `override_nav`
+`config_initialize` → `config_update` / `config_add_manager` / `config_remove_manager` / `config_claim_platform_fee` / `nav_override`
 
 **NAV updater**
-`update_nav(total_assets)` once per epoch per vault. Settles management and
+`nav_update(total_assets)` once per epoch per vault. Settles management and
 performance fees as share dilution, stores `nav_per_share`. Rejected if total
 assets are below the vault's idle balance or NAV moves more than
-`max_nav_deviation_bps`; the admin can `override_nav` past the bound.
+`max_nav_deviation_bps`; the admin can `nav_override` past the bound.
 Withdrawals are capped per epoch by `max_epoch_outflow_bps`.
 
 **Guardian**
-`pause_protocol` only. Unpausing is admin-only via `update_config`.
+`config_pause` only. Unpausing is admin-only via `config_update`.
 
 **Manager**
-`initialize_vault` (requires Manager PDA) → `update_vault` / `close_vault` / `claim_manager_fee`
+`vault_initialize` (requires Manager PDA) → `vault_update` / `vault_close` / `vault_claim_manager_fee`
 Strategies: `jupiter_initialize_strategy` / `jupiter_swap`,
 `meteora_dlmm_initialize_position` / `meteora_dlmm_add_liquidity` / `meteora_dlmm_remove_liquidity` /
-`meteora_dlmm_claim_fee` (10% of claimed fees to the treasury), `close_strategy`.
+`meteora_dlmm_claim_fee` (10% of claimed fees to the treasury), `vault_close_strategy`.
 
 **User**
-`request_deposit` → (NAV posted in a later epoch) → `resolve_deposit_request`
-`request_withdrawal` → (NAV posted in a later epoch) → `resolve_withdrawal_request`
-`cancel_*_request` is allowed only until a NAV covering the request is posted.
+`deposit_request_create` → (NAV posted in a later epoch) → `deposit_request_resolve`
+`withdrawal_request_create` → (NAV posted in a later epoch) → `withdrawal_request_resolve`
+`*_request_cancel` is allowed only until a NAV covering the request is posted.
 Resolution is permissionless.
 
 ## Build
