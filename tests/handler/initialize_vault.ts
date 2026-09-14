@@ -12,12 +12,11 @@ describe("hedge_vault", () => {
   it("initialize_vault", async () => {
     const args = {
       name: toBytes("Test Vault", 32),
-      description: toBytes("QA vault for hedge_vault", 64),
       performanceFeeBps: 1000, // 10 %
       managementFeeBps: 200, // 2 % / year
       depositCap: new BN(1_000_000 * 10 ** DEPOSIT_MINT_DECIMALS),
       minDeposit: new BN(10 * 10 ** DEPOSIT_MINT_DECIMALS),
-      minWithdrawalShares: new BN(0),
+      minWithdrawalShares: new BN(1 * 10 ** DEPOSIT_MINT_DECIMALS),
     };
 
     const config = await program.account.config.fetch(getConfigPda());

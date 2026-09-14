@@ -106,6 +106,7 @@ impl<'info> RequestWithdrawal<'info> {
                 authority: withdrawer_key,
                 vault: vault_key,
                 epoch,
+                created_ts: now,
                 bump: ctx.bumps.withdrawal_request,
             }));
         } else {

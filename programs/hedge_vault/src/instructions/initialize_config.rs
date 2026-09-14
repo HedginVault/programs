@@ -14,6 +14,7 @@ pub struct InitializeConfigArgs {
     pub platform_management_fee_bps: u16,
     pub max_nav_deviation_bps: u16,
     pub max_epoch_outflow_bps: u16,
+    pub max_slippage_bps: u16,
 }
 
 #[derive(Accounts)]
@@ -54,6 +55,11 @@ impl<'info> InitializeConfig<'info> {
             validate!(bps <= MAX_BPS, HedgeVaultError::InvalidBasisPoints)?;
         }
 
+        validate!(
+            args.max_slippage_bps > 0 && args.max_slippage_bps <= MAX_BPS,
+            HedgeVaultError::InvalidBasisPoints
+        )?;
+
         let mut config = config.load_init()?;
 
         *config = Config::new(NewConfigArgs {
@@ -65,6 +71,7 @@ impl<'info> InitializeConfig<'info> {
             platform_management_fee_bps: args.platform_management_fee_bps,
             max_nav_deviation_bps: args.max_nav_deviation_bps,
             max_epoch_outflow_bps: args.max_epoch_outflow_bps,
+            max_slippage_bps: args.max_slippage_bps,
             bump: ctx.bumps.config,
         });
 

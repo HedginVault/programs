@@ -3,7 +3,7 @@
 
 pub use anchor_lang::prelude::Pubkey;
 pub use anchor_spl::{token::ID as TOKEN_PROGRAM, token_2022::ID as TOKEN_2022_PROGRAM};
-pub use hedge_vault::error::HedgeVaultError;
+pub use hedge_vault::{error::HedgeVaultError, ProtocolStatus, Strategy, VaultStatus};
 pub use solana_sdk::{signature::Keypair, signer::Signer};
 
 use anchor_lang::{system_program, AccountDeserialize, InstructionData, ToAccountMetas};
@@ -20,12 +20,12 @@ use anchor_spl::{
 };
 use hedge_vault::{
     accounts, instruction, Config, DepositRequest, InitializeConfigArgs, InitializeVaultArgs,
-    ProtocolStatus, UpdateConfigArgs, UpdateVaultArgs, Vault, WithdrawalRequest,
+    UpdateConfigArgs, UpdateVaultArgs, Vault, WithdrawalRequest,
 };
 use litesvm::{types::TransactionResult, LiteSVM};
 use solana_sdk::{
     clock::Clock,
-    instruction::{Instruction, InstructionError},
+    instruction::{AccountMeta, Instruction, InstructionError},
     system_instruction,
     transaction::{Transaction, TransactionError},
 };
@@ -33,6 +33,15 @@ use solana_sdk::{
 pub const DAY: i64 = 86_400;
 pub const USDC: u64 = 1_000_000;
 pub const START_TS: i64 = 100 * DAY;
+
+/// `anchor_lang::error::ErrorCode::ConstraintAssociated`, raised when an account fails an
+/// `associated_token::` constraint.
+pub const ANCHOR_CONSTRAINT_ASSOCIATED: u32 =
+    anchor_lang::error::ErrorCode::ConstraintAssociated as u32;
+
+/// Mirrors `protocol::jupiter::JUPITER_AGGREGATOR_EVENT_AUTHORITY`.
+pub const JUPITER_EVENT_AUTHORITY: Pubkey =
+    hedge_vault::protocol::jupiter::JUPITER_AGGREGATOR_EVENT_AUTHORITY;
 
 const PROGRAM_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -77,6 +86,11 @@ pub fn withdrawal_request_pda(vault: &Pubkey, authority: &Pubkey) -> Pubkey {
     pda(&[b"withdrawal_request", vault.as_ref(), authority.as_ref()])
 }
 
+/// `protocol_account` is the Jupiter target mint or the DLMM position.
+pub fn strategy_pda(vault: &Pubkey, protocol_account: &Pubkey) -> Pubkey {
+    pda(&[b"strategy", vault.as_ref(), protocol_account.as_ref()])
+}
+
 pub fn ata(owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> Pubkey {
     get_associated_token_address_with_program_id(owner, mint, token_program)
 }
@@ -91,10 +105,16 @@ pub fn ix(accounts: impl ToAccountMetas, data: impl InstructionData) -> Instruct
 
 /// Asserts the transaction failed in its first instruction with `error`.
 pub fn assert_error(result: TransactionResult, error: HedgeVaultError) {
+    assert_error_code(result, error.into());
+}
+
+/// Asserts the transaction failed in its first instruction with a raw custom error code,
+/// used for Anchor's own constraint errors.
+pub fn assert_error_code(result: TransactionResult, code: u32) {
     let failed = result.expect_err("transaction should have failed");
     assert_eq!(
         failed.err,
-        TransactionError::InstructionError(0, InstructionError::Custom(error.into())),
+        TransactionError::InstructionError(0, InstructionError::Custom(code)),
         "logs: {:#?}",
         failed.meta.logs
     );
@@ -146,6 +166,7 @@ impl TestContext {
                     platform_management_fee_bps: 0,
                     max_nav_deviation_bps: 10_000,
                     max_epoch_outflow_bps: 10_000,
+                    max_slippage_bps: 300,
                 },
             },
         );
@@ -258,6 +279,11 @@ impl TestContext {
         }
     }
 
+    pub fn strategy(&self, address: &Pubkey) -> Option<Strategy> {
+        let account = self.svm.get_account(address)?;
+        Strategy::try_deserialize(&mut account.data.as_slice()).ok()
+    }
+
     pub fn config(&self) -> Config {
         let data = self.svm.get_account(&config_pda()).unwrap().data;
         bytemuck::pod_read_unaligned(&data[8..8 + core::mem::size_of::<Config>()])
@@ -290,6 +316,7 @@ impl TestContext {
             platform_management_fee_bps: None,
             max_nav_deviation_bps: None,
             max_epoch_outflow_bps: None,
+            max_slippage_bps: None,
             status: None,
         }
     }
@@ -321,18 +348,16 @@ impl TestContext {
     pub fn vault_args() -> InitializeVaultArgs {
         InitializeVaultArgs {
             name: [0; 32],
-            description: [0; 64],
             performance_fee_bps: 0,
             management_fee_bps: 0,
             deposit_cap: 1_000_000 * USDC,
-            min_deposit: 0,
-            min_withdrawal_shares: 0,
+            min_deposit: 1,
+            min_withdrawal_shares: 1,
         }
     }
 
     pub fn update_vault_args() -> UpdateVaultArgs {
         UpdateVaultArgs {
-            description: None,
             performance_fee_bps: None,
             management_fee_bps: None,
             deposit_cap: None,
@@ -635,5 +660,127 @@ impl TestContext {
         );
         let signers: Vec<&Keypair> = signer.into_iter().collect();
         self.send(&[reject], &signers)
+    }
+
+    // Vault status
+
+    pub fn pause_vault(&mut self, v: &TestVault) -> TransactionResult {
+        let pause = ix(
+            accounts::PauseVault {
+                guardian: self.admin.pubkey(),
+                config: config_pda(),
+                vault: v.address,
+            },
+            instruction::PauseVault {},
+        );
+        self.send(&[pause], &[])
+    }
+
+    pub fn close_vault(&mut self, v: &TestVault) -> TransactionResult {
+        let close = ix(
+            accounts::CloseVault {
+                authority: self.admin.pubkey(),
+                vault: v.address,
+                deposit_mint: v.deposit_mint,
+                share_mint: v.share_mint,
+                vault_token_account: ata(&v.address, &v.deposit_mint, &v.deposit_token_program),
+                deposit_escrow: deposit_escrow_pda(&v.address),
+                share_escrow: share_escrow_pda(&v.address),
+                deposit_mint_token_program: v.deposit_token_program,
+                share_token_program: TOKEN_PROGRAM,
+                system_program: system_program::ID,
+            },
+            instruction::CloseVault {},
+        );
+        self.send(&[close], &[])
+    }
+
+    // Strategies
+
+    pub fn jupiter_initialize_strategy(
+        &mut self,
+        v: &TestVault,
+        destination_mint: &Pubkey,
+    ) -> TransactionResult {
+        let initialize = ix(
+            accounts::JupiterInitializeStrategy {
+                authority: self.admin.pubkey(),
+                config: config_pda(),
+                vault: v.address,
+                strategy: strategy_pda(&v.address, destination_mint),
+                destination_mint: *destination_mint,
+                system_program: system_program::ID,
+            },
+            instruction::JupiterInitializeStrategy {},
+        );
+        self.send(&[initialize], &[])
+    }
+
+    /// Closes a Jupiter strategy. `vault` may differ from the strategy's own vault to
+    /// exercise the cross-vault guard.
+    pub fn close_jupiter_strategy(
+        &mut self,
+        v: &TestVault,
+        strategy_vault: &Pubkey,
+        target_mint: &Pubkey,
+    ) -> TransactionResult {
+        let mut close = ix(
+            accounts::CloseStrategy {
+                authority: self.admin.pubkey(),
+                config: config_pda(),
+                vault: v.address,
+                strategy: strategy_pda(strategy_vault, target_mint),
+                system_program: system_program::ID,
+            },
+            instruction::CloseStrategy {},
+        );
+        close.accounts.push(AccountMeta::new(
+            ata(&v.address, target_mint, &TOKEN_PROGRAM),
+            false,
+        ));
+        close
+            .accounts
+            .push(AccountMeta::new_readonly(TOKEN_PROGRAM, false));
+
+        self.send(&[close], &[])
+    }
+
+    /// `source` is passed as `vault_source_token_account`, so a non-ATA can be tried.
+    pub fn jupiter_swap(
+        &mut self,
+        v: &TestVault,
+        source: &Pubkey,
+        source_mint: &Pubkey,
+        destination_mint: &Pubkey,
+        amount: u64,
+    ) -> TransactionResult {
+        let swap = ix(
+            accounts::JupiterSwap {
+                authority: self.admin.pubkey(),
+                config: config_pda(),
+                vault: v.address,
+                strategy: strategy_pda(&v.address, destination_mint),
+                source_mint: *source_mint,
+                destination_mint: *destination_mint,
+                vault_source_token_account: *source,
+                vault_destination_token_account: ata(
+                    &v.address,
+                    destination_mint,
+                    &TOKEN_PROGRAM,
+                ),
+                system_program: system_program::ID,
+                source_token_program: TOKEN_PROGRAM,
+                destination_token_program: TOKEN_PROGRAM,
+                associated_token_program: anchor_spl::associated_token::ID,
+                event_authority: JUPITER_EVENT_AUTHORITY,
+                jupiter_program: hedge_vault::jupiter::ID,
+            },
+            instruction::JupiterSwap {
+                swap_data: vec![0u8; 32],
+                amount,
+                slippage_bps: 100,
+            },
+        );
+        self.send(&[swap], &[])
     }
 }

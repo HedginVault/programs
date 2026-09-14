@@ -19,6 +19,7 @@ pub struct UpdateConfigArgs {
     pub platform_management_fee_bps: Option<u16>,
     pub max_nav_deviation_bps: Option<u16>,
     pub max_epoch_outflow_bps: Option<u16>,
+    pub max_slippage_bps: Option<u16>,
     pub status: Option<ProtocolStatus>,
 }
 
@@ -116,6 +117,15 @@ impl<'info> UpdateConfig<'info> {
             config.max_epoch_outflow_bps = max_epoch_outflow_bps;
         }
 
+        if let Some(max_slippage_bps) = args.max_slippage_bps {
+            validate!(
+                max_slippage_bps > 0 && max_slippage_bps <= MAX_BPS,
+                HedgeVaultError::InvalidBasisPoints
+            )?;
+
+            config.max_slippage_bps = max_slippage_bps;
+        }
+
         if let Some(status) = args.status {
             config.status = status;
         }
@@ -129,6 +139,7 @@ impl<'info> UpdateConfig<'info> {
             platform_management_fee_bps: config.platform_management_fee_bps,
             max_nav_deviation_bps: config.max_nav_deviation_bps,
             max_epoch_outflow_bps: config.max_epoch_outflow_bps,
+            max_slippage_bps: config.max_slippage_bps,
             status: config.status,
         });
 

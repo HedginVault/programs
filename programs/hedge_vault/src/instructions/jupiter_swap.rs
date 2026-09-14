@@ -9,9 +9,12 @@ use crate::{
     error::HedgeVaultError,
     events::JupiterSwapped,
     jupiter,
-    protocol::jupiter::{JupiterSwapCpi, JUPITER_AGGREGATOR_EVENT_AUTHORITY},
+    protocol::jupiter::{
+        max_amount_in, min_amount_out, JupiterSwapCpi, SwapMode, SwapVariant,
+        JUPITER_AGGREGATOR_EVENT_AUTHORITY,
+    },
     seeds::{CONFIG, STRATEGY, VAULT},
-    strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
+    strategy_seeds, validate, vault_seeds, Config, SafeMath, Strategy, StrategyType, Vault,
 };
 
 #[derive(Accounts)]
@@ -24,7 +27,13 @@ pub struct JupiterSwap<'info> {
     pub strategy: Box<Account<'info, Strategy>>,
     pub source_mint: InterfaceAccount<'info, Mint>,
     pub destination_mint: InterfaceAccount<'info, Mint>,
-    #[account(mut)]
+    /// Pinned to the vault's ATA so the deposit and share escrows can never be the source.
+    #[account(
+        mut,
+        associated_token::mint = source_mint,
+        associated_token::authority = vault,
+        associated_token::token_program = source_token_program,
+    )]
     pub vault_source_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
         init_if_needed,
@@ -35,6 +44,7 @@ pub struct JupiterSwap<'info> {
     )]
     pub vault_destination_token_account: InterfaceAccount<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
+    pub source_token_program: Interface<'info, TokenInterface>,
     pub destination_token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     /// CHECK: Jupiter event authority
@@ -76,6 +86,8 @@ impl<'info> JupiterSwap<'info> {
         Config::validate_address(config_seeds, config_key)?;
         config.is_protocol_operational()?;
 
+        let max_slippage_bps = config.max_slippage_bps();
+
         let vault_key = vault.key();
         let vault = vault.load()?;
         let vault_id = vault.id.to_le_bytes();
@@ -84,6 +96,17 @@ impl<'info> JupiterSwap<'info> {
 
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.validate_authority(authority.key())?;
+        vault.is_vault_operational()?;
+
+        validate!(
+            source_mint.key() != destination_mint.key(),
+            HedgeVaultError::InvalidSwapMints
+        )?;
+        // the share mint is vault-owned bookkeeping, it is never a swap leg
+        validate!(
+            destination_mint.key() != vault.share_mint,
+            HedgeVaultError::InvalidStrategyMint
+        )?;
 
         // one side of the swap is the deposit mint, the other is the strategy target mint
         let target_mint = if source_mint.key() == vault.deposit_mint {
@@ -116,7 +139,16 @@ impl<'info> JupiterSwap<'info> {
         strategy.record_action(now);
         drop(vault);
 
-        JupiterSwapCpi::check_amount_and_slippage(&swap_data, amount, slippage_bps)?;
+        let variant = SwapVariant::from_swap_data(&swap_data)?;
+        let route_args = JupiterSwapCpi::check_amount_and_slippage(
+            &swap_data,
+            amount,
+            slippage_bps,
+            max_slippage_bps,
+        )?;
+
+        let source_balance_before = vault_source_token_account.amount;
+        let destination_balance_before = vault_destination_token_account.amount;
 
         let mut jupiter_swap = JupiterSwapCpi {
             event_authority: event_authority.to_account_info(),
@@ -130,6 +162,34 @@ impl<'info> JupiterSwap<'info> {
         };
 
         jupiter_swap.swap(&swap_data, ctx.remaining_accounts, vault_seeds)?;
+
+        // the route is built by the manager, so the vault checks what actually moved
+        vault_source_token_account.reload()?;
+        vault_destination_token_account.reload()?;
+
+        let destination_received = vault_destination_token_account
+            .amount
+            .safe_sub(destination_balance_before)?;
+        let source_spent = source_balance_before.safe_sub(vault_source_token_account.amount)?;
+
+        match variant.mode() {
+            SwapMode::ExactIn => {
+                validate!(
+                    destination_received >= min_amount_out(route_args.quoted_amount, max_slippage_bps)?,
+                    HedgeVaultError::SwapOutputBelowMinimum
+                )?;
+            }
+            SwapMode::ExactOut => {
+                validate!(
+                    destination_received >= route_args.amount,
+                    HedgeVaultError::SwapOutputBelowMinimum
+                )?;
+                validate!(
+                    source_spent <= max_amount_in(route_args.quoted_amount, max_slippage_bps)?,
+                    HedgeVaultError::SwapOutputBelowMinimum
+                )?;
+            }
+        }
 
         emit!(JupiterSwapped {
             vault: vault_key,

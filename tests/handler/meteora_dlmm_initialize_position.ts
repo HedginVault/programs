@@ -1,7 +1,7 @@
 import DLMM from "@meteora-ag/dlmm";
 import { Keypair } from "@solana/web3.js";
 import { DLMM_EVENT_AUTHORITY } from "../../utils/constants";
-import { getStrategyPda } from "../../utils/pda";
+import { getConfigPda, getStrategyPda } from "../../utils/pda";
 import { LB_PAIR, VAULT } from "./params";
 import { connection, log, program, run, wallet } from "./setup";
 
@@ -23,6 +23,7 @@ describe("hedge_vault", () => {
       .meteoraDlmmInitializePosition(lowerBinId, upperBinId)
       .accounts({
         authority: wallet.publicKey,
+        config: getConfigPda(),
         vault: VAULT,
         position: position.publicKey,
         lbPair: LB_PAIR,

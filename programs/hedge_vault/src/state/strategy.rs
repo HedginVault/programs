@@ -43,6 +43,8 @@ pub struct Strategy {
     /// Layout version, see [STRATEGY_VERSION].
     pub version: u8,
     padding0: [u8; 2],
+    /// Reserved for future fields, the enum has to stay last.
+    pub reserved: [u8; 32],
     /// Details about the underlying protocol and action of the strategy.
     pub strategy_type: StrategyType,
 }
@@ -57,6 +59,7 @@ impl Strategy {
             bump: args.bump,
             version: STRATEGY_VERSION,
             padding0: [0; 2],
+            reserved: [0; 32],
             strategy_type: args.strategy_type,
         }
     }
@@ -77,5 +80,6 @@ impl Space for Strategy {
         + size_of::<u32>()
         + size_of::<u8>()
         + size_of::<u8>()
-        + size_of::<u8>() * 2;
+        + size_of::<u8>() * 2
+        + size_of::<u8>() * 32;
 }

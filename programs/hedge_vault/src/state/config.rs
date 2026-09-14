@@ -2,7 +2,10 @@ use anchor_lang::prelude::*;
 use bytemuck::{Pod, Zeroable};
 use num_derive::{FromPrimitive, ToPrimitive};
 
-use crate::{error::HedgeVaultError, validate, validate_pda, SafeMathAssign, CONFIG_VERSION};
+use crate::{
+    error::HedgeVaultError, validate, validate_pda, SafeMathAssign, CONFIG_VERSION,
+    DEFAULT_MAX_SLIPPAGE_BPS,
+};
 
 #[derive(
     AnchorSerialize,
@@ -33,6 +36,7 @@ pub struct NewConfigArgs {
     pub platform_management_fee_bps: u16,
     pub max_nav_deviation_bps: u16,
     pub max_epoch_outflow_bps: u16,
+    pub max_slippage_bps: u16,
     pub bump: u8,
 }
 
@@ -66,7 +70,10 @@ pub struct Config {
     padding1: [u8; 7],
     /// Admin nominated through `update_config`, becomes admin once it signs `accept_admin`. Default pubkey when none.
     pub pending_admin: Pubkey,
-    reserve: [u64; 19],
+    /// Max slippage accepted on a routed swap, denoted in basis points. Zero means [DEFAULT_MAX_SLIPPAGE_BPS].
+    pub max_slippage_bps: u16,
+    padding2: [u8; 6],
+    reserve: [u64; 18],
 }
 
 impl Config {
@@ -87,12 +94,24 @@ impl Config {
             version: CONFIG_VERSION,
             padding1: [0; 7],
             pending_admin: Pubkey::default(),
-            reserve: [0; 19],
+            max_slippage_bps: args.max_slippage_bps,
+            padding2: [0; 6],
+            reserve: [0; 18],
         }
     }
 
     pub fn validate_address(seeds: &[&[u8]], key: Pubkey) -> Result<()> {
         validate_pda(seeds, key, HedgeVaultError::InvalidConfig.into())
+    }
+
+    /// Configs written before the field existed carry a zeroed reserve, so zero falls back
+    /// to [DEFAULT_MAX_SLIPPAGE_BPS].
+    pub fn max_slippage_bps(&self) -> u16 {
+        if self.max_slippage_bps == 0 {
+            DEFAULT_MAX_SLIPPAGE_BPS
+        } else {
+            self.max_slippage_bps
+        }
     }
 
     pub fn validate_admin(&self, admin: Pubkey) -> Result<()> {
@@ -188,6 +207,7 @@ mod tests {
             platform_management_fee_bps: 0,
             max_nav_deviation_bps: 0,
             max_epoch_outflow_bps: 0,
+            max_slippage_bps: 0,
             bump: 0,
         })
     }
@@ -202,6 +222,16 @@ mod tests {
 
         // account offset in docs/architecture-evolution.md 3.4 includes the 8-byte discriminator
         assert_eq!(core::mem::offset_of!(Config, pending_admin) + 8, 168);
+        assert_eq!(core::mem::offset_of!(Config, max_slippage_bps) + 8, 200);
+    }
+
+    #[test]
+    fn max_slippage_bps_falls_back_to_the_default_when_unset() {
+        let mut config = new_config(Pubkey::new_unique());
+        assert_eq!(config.max_slippage_bps(), DEFAULT_MAX_SLIPPAGE_BPS);
+
+        config.max_slippage_bps = 100;
+        assert_eq!(config.max_slippage_bps(), 100);
     }
 
     #[test]

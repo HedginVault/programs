@@ -28,6 +28,36 @@ fn enforces_minimum_request_sizes() {
 }
 
 #[test]
+fn initialize_vault_rejects_a_zero_minimum() {
+    let mut ctx = TestContext::new();
+    let mint = ctx.create_mint(&TOKEN_PROGRAM, None);
+
+    let mut args = TestContext::vault_args();
+    args.min_deposit = 0;
+    let (_, result) = ctx.initialize_vault(mint, TOKEN_PROGRAM, args);
+    assert_error(result, HedgeVaultError::InvalidMinimumAmount);
+
+    let mut args = TestContext::vault_args();
+    args.min_withdrawal_shares = 0;
+    let (_, result) = ctx.initialize_vault(mint, TOKEN_PROGRAM, args);
+    assert_error(result, HedgeVaultError::InvalidMinimumAmount);
+}
+
+#[test]
+fn update_vault_rejects_a_zero_minimum() {
+    let mut ctx = TestContext::new();
+    let v = ctx.setup_vault();
+
+    let mut args = TestContext::update_vault_args();
+    args.min_deposit = Some(0);
+    assert_error(ctx.update_vault(&v, args), HedgeVaultError::InvalidMinimumAmount);
+
+    let mut args = TestContext::update_vault_args();
+    args.min_withdrawal_shares = Some(0);
+    assert_error(ctx.update_vault(&v, args), HedgeVaultError::InvalidMinimumAmount);
+}
+
+#[test]
 fn manager_updates_minimums() {
     let mut ctx = TestContext::new();
     let v = ctx.setup_vault();

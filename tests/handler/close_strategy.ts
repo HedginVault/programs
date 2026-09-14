@@ -1,15 +1,23 @@
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { AccountMeta, PublicKey } from "@solana/web3.js";
 import { DLMM_EVENT_AUTHORITY, DLMM_PROGRAM_ID } from "../../utils/constants";
-import { getStrategyPda } from "../../utils/pda";
+import { getConfigPda, getStrategyPda } from "../../utils/pda";
 import { DLMM_POSITION, VAULT } from "./params";
 import { fetchTokenProgram, log, program, run, wallet } from "./setup";
 
 /// Strategy to close, the DLMM position or the Jupiter target mint.
 const PROTOCOL_ACCOUNT = DLMM_POSITION;
 
-const readonly = (pubkey: PublicKey): AccountMeta => ({ pubkey, isSigner: false, isWritable: false });
-const writable = (pubkey: PublicKey): AccountMeta => ({ pubkey, isSigner: false, isWritable: true });
+const readonly = (pubkey: PublicKey): AccountMeta => ({
+  pubkey,
+  isSigner: false,
+  isWritable: false,
+});
+const writable = (pubkey: PublicKey): AccountMeta => ({
+  pubkey,
+  isSigner: false,
+  isWritable: true,
+});
 
 describe("hedge_vault", () => {
   it("close_strategy", async () => {
@@ -30,15 +38,22 @@ describe("hedge_vault", () => {
               strategyType.jupiterSwap.targetMint,
               VAULT,
               true,
-              await fetchTokenProgram(strategyType.jupiterSwap.targetMint),
-            ),
+              await fetchTokenProgram(strategyType.jupiterSwap.targetMint)
+            )
           ),
-          readonly(await fetchTokenProgram(strategyType.jupiterSwap.targetMint)),
+          readonly(
+            await fetchTokenProgram(strategyType.jupiterSwap.targetMint)
+          ),
         ];
 
     const ix = await program.methods
       .closeStrategy()
-      .accounts({ authority: wallet.publicKey, vault: VAULT, strategy })
+      .accounts({
+        authority: wallet.publicKey,
+        config: getConfigPda(),
+        vault: VAULT,
+        strategy,
+      })
       .remainingAccounts(remainingAccounts)
       .instruction();
 

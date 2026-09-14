@@ -17,14 +17,19 @@ describe("hedge_vault", () => {
       ? [TARGET_MINT, vault.depositMint]
       : [vault.depositMint, TARGET_MINT];
 
+    // resolved by anchor from the associated_token constraint, derived here for the balance read
+    const sourceTokenProgram = await fetchTokenProgram(sourceMint);
     const vaultSourceTokenAccount = getAssociatedTokenAddressSync(
       sourceMint,
       VAULT,
       true,
-      await fetchTokenProgram(sourceMint),
+      sourceTokenProgram
     );
     const amount = SWAP_BACK
-      ? Number((await connection.getTokenAccountBalance(vaultSourceTokenAccount)).value.amount)
+      ? Number(
+          (await connection.getTokenAccountBalance(vaultSourceTokenAccount))
+            .value.amount
+        )
       : 1 * 10 ** DEPOSIT_MINT_DECIMALS;
 
     const { swapData, remainingAccounts, lookupTables } = await getJupiterSwap(
@@ -33,7 +38,7 @@ describe("hedge_vault", () => {
       destinationMint,
       amount,
       slippageBps,
-      VAULT,
+      VAULT
     );
 
     const ix = await program.methods
@@ -45,7 +50,7 @@ describe("hedge_vault", () => {
         strategy: getStrategyPda(VAULT, TARGET_MINT),
         sourceMint,
         destinationMint,
-        vaultSourceTokenAccount,
+        sourceTokenProgram,
         destinationTokenProgram: await fetchTokenProgram(destinationMint),
       })
       .remainingAccounts(remainingAccounts)

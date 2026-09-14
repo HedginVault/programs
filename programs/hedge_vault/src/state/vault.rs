@@ -11,7 +11,6 @@ pub struct NewVaultArgs {
     pub id: u64,
     pub authority: Pubkey,
     pub name: [u8; 32],
-    pub description: [u8; 64],
     pub deposit_mint: Pubkey,
     pub share_mint: Pubkey,
     pub deposit_cap: u64,
@@ -69,8 +68,9 @@ pub struct Vault {
     pub authority: Pubkey,
     /// Name of the vault (utf8 bytes, padded with 0s).
     pub name: [u8; 32],
-    /// Description of the vault (utf8 bytes, padded with 0s).
-    pub description: [u8; 64],
+    /// 80..144, reserved for two future `Pubkey` fields (e.g. `pending_authority`, `delegate`).
+    /// Vault metadata beyond `name` lives off-chain.
+    reserved_keys: [u8; 64],
     /// Mint accepted as vault deposits.
     pub deposit_mint: Pubkey,
     /// Mint of the tokenized vault shares, authority is the vault.
@@ -127,8 +127,10 @@ pub struct Vault {
     pub pending_performance_fee_bps: u16,
     /// Management fee that replaces [Vault::management_fee_bps] once [Vault::fee_effective_ts] has passed.
     pub pending_management_fee_bps: u16,
-    /// 384..424, reserved for `nav_update_count` and future fields.
-    reserved3: [u8; 40],
+    /// Strategies currently open on the vault, must be zero before the vault can be closed.
+    pub open_strategy_count: u32,
+    /// 388..424, reserved for `nav_update_count` and future fields.
+    reserved3: [u8; 36],
 }
 
 impl Vault {
@@ -137,7 +139,7 @@ impl Vault {
             id: args.id,
             authority: args.authority,
             name: args.name,
-            description: args.description,
+            reserved_keys: [0; 64],
             deposit_mint: args.deposit_mint,
             share_mint: args.share_mint,
             deposit_cap: args.deposit_cap,
@@ -166,7 +168,8 @@ impl Vault {
             reserved2: [0; 12],
             pending_performance_fee_bps: 0,
             pending_management_fee_bps: 0,
-            reserved3: [0; 40],
+            open_strategy_count: 0,
+            reserved3: [0; 36],
         }
     }
 
@@ -207,6 +210,18 @@ impl Vault {
 
     pub fn increment_strategy_id(&mut self) -> Result<()> {
         self.next_strategy_id.safe_add_assign(1)
+    }
+
+    pub fn increment_open_strategies(&mut self) -> Result<()> {
+        self.open_strategy_count.safe_add_assign(1)
+    }
+
+    pub fn decrement_open_strategies(&mut self) -> Result<()> {
+        self.open_strategy_count.safe_sub_assign(1)
+    }
+
+    pub fn pause(&mut self) {
+        self.status = VaultStatus::Paused;
     }
 
     pub fn is_vault_operational(self) -> Result<()> {
@@ -535,7 +550,6 @@ mod tests {
             id: 0,
             authority: Pubkey::default(),
             name: [0; 32],
-            description: [0; 64],
             deposit_mint: Pubkey::default(),
             share_mint: Pubkey::default(),
             deposit_cap: u64::MAX,
@@ -568,11 +582,29 @@ mod tests {
         assert_eq!(core::mem::size_of::<Vault>(), 416);
 
         // account offsets in docs/architecture-evolution.md 3.5 include the 8-byte discriminator
+        assert_eq!(core::mem::offset_of!(Vault, reserved_keys) + 8, 80);
         assert_eq!(core::mem::offset_of!(Vault, min_deposit) + 8, 320);
         assert_eq!(core::mem::offset_of!(Vault, min_withdrawal_shares) + 8, 328);
         assert_eq!(core::mem::offset_of!(Vault, fee_effective_ts) + 8, 360);
         assert_eq!(core::mem::offset_of!(Vault, pending_performance_fee_bps) + 8, 380);
         assert_eq!(core::mem::offset_of!(Vault, pending_management_fee_bps) + 8, 382);
+        assert_eq!(core::mem::offset_of!(Vault, open_strategy_count) + 8, 384);
+    }
+
+    #[test]
+    fn open_strategy_count_tracks_initialize_and_close() {
+        let mut v = new_vault(0, 0);
+        assert_eq!(v.open_strategy_count, 0);
+
+        v.increment_open_strategies().unwrap();
+        v.increment_open_strategies().unwrap();
+        assert_eq!(v.open_strategy_count, 2);
+
+        v.decrement_open_strategies().unwrap();
+        assert_eq!(v.open_strategy_count, 1);
+
+        v.decrement_open_strategies().unwrap();
+        assert_err(v.decrement_open_strategies(), HedgeVaultError::MathOverflow);
     }
 
     #[test]

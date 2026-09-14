@@ -184,7 +184,7 @@ title Vault v1 - 424 bytes
 8-15: "id"
 16-47: "authority"
 48-79: "name"
-80-143: "description"
+80-143: "reserved_keys (2 x Pubkey)"
 144-175: "deposit_mint"
 176-207: "share_mint"
 208-215: "deposit_cap"
@@ -432,7 +432,7 @@ sequenceDiagram
 - Admin key → Squads multisig. No program change needed; `config.admin` is just a pubkey.
 - Timelock inside the program (`timelock_secs`): sensitive `update_config` fields are
   written as `pending_*` with `pending_change_ts`, applied by a second call after the delay.
-  Guardians can pause during the window. Non-sensitive fields (description) stay immediate.
+  Guardians can pause during the window. Non-sensitive fields (`deposit_cap`) stay immediate.
 - Upgrade authority → the same multisig behind a timelock program, plus a verified build so
   the on-chain hash is reproducible from the repo.
 

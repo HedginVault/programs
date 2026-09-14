@@ -50,7 +50,7 @@ erDiagram
         u64 id PK "from config.next_vault_id"
         Pubkey authority FK "manager, not part of the seeds"
         bytes32 name
-        bytes64 description
+        bytes64 reserved_keys "two future Pubkey slots"
         Pubkey deposit_mint FK
         Pubkey share_mint FK
         u64 deposit_cap
@@ -197,7 +197,7 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | `id` | `u64` | Sequential id from config. |
 | `authority` | `Pubkey` | Manager; signs all strategy and vault management instructions. Not part of the seeds, so it can be reassigned by a future instruction. |
 | `name` | `[u8; 32]` | UTF-8, zero padded. |
-| `description` | `[u8; 64]` | UTF-8, zero padded. |
+| `reserved_keys` | `[u8; 64]` | Reserved for two future `Pubkey` fields (e.g. `pending_authority`, `delegate`). Metadata beyond `name` lives off-chain. |
 | `deposit_mint` | `Pubkey` | Only mint accepted for deposits and paid on withdrawals. |
 | `share_mint` | `Pubkey` | Tokenized share mint, see below. |
 | `deposit_cap` | `u64` | `total_assets + pending_deposits` must stay below this on `request_deposit`. |

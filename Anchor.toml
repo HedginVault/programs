@@ -28,6 +28,7 @@ accept-admin = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/ac
 add-manager = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/add_manager.ts"
 remove-manager = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/remove_manager.ts"
 pause-protocol = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/pause_protocol.ts"
+pause-vault = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/pause_vault.ts"
 initialize-vault = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/initialize_vault.ts"
 update-vault = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/update_vault.ts"
 close-vault = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/handler/close_vault.ts"

@@ -22,6 +22,7 @@ pub struct ConfigUpdated {
     pub platform_management_fee_bps: u16,
     pub max_nav_deviation_bps: u16,
     pub max_epoch_outflow_bps: u16,
+    pub max_slippage_bps: u16,
     pub status: ProtocolStatus,
 }
 
@@ -80,6 +81,12 @@ pub struct VaultUpdated {
     pub min_deposit: u64,
     pub min_withdrawal_shares: u64,
     pub status: VaultStatus,
+}
+
+#[event]
+pub struct VaultPaused {
+    pub vault: Pubkey,
+    pub guardian: Pubkey,
 }
 
 #[event]

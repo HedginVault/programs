@@ -6,6 +6,7 @@ pub struct NewWithdrawalRequestArgs {
     pub authority: Pubkey,
     pub vault: Pubkey,
     pub epoch: u64,
+    pub created_ts: i64,
     pub bump: u8,
 }
 
@@ -21,7 +22,11 @@ pub struct WithdrawalRequest {
     pub shares: u64,
     /// Epoch the request was made in.
     pub epoch: u64,
+    /// Timestamp the request was created.
+    pub created_ts: i64,
     pub bump: u8,
+    /// Reserved for future fields.
+    pub reserved: [u8; 32],
 }
 
 impl WithdrawalRequest {
@@ -31,7 +36,9 @@ impl WithdrawalRequest {
             vault: args.vault,
             shares: 0,
             epoch: args.epoch,
+            created_ts: args.created_ts,
             bump: args.bump,
+            reserved: [0; 32],
         }
     }
 

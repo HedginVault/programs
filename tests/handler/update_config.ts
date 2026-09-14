@@ -12,6 +12,7 @@ describe("hedge_vault", () => {
       platformManagementFeeBps: null,
       maxNavDeviationBps: null,
       maxEpochOutflowBps: null,
+      maxSlippageBps: null,
       status: { normal: {} },
     };
 

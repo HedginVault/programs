@@ -4,7 +4,6 @@ import { log, program, run, wallet } from "./setup";
 describe("hedge_vault", () => {
   it("update_vault", async () => {
     const args = {
-      description: null,
       performanceFeeBps: null,
       managementFeeBps: null,
       depositCap: null,

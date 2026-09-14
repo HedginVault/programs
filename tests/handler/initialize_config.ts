@@ -12,6 +12,7 @@ describe("hedge_vault", () => {
       platformManagementFeeBps: 50, // 0.5 % / year
       maxNavDeviationBps: 2000, // 20 % per update
       maxEpochOutflowBps: 2000, // 20 % per epoch
+      maxSlippageBps: 300, // 3 % per swap
     };
 
     log("Config", getConfigPda());
