@@ -1,9 +1,10 @@
 import { getConfigPda, getManagerPda } from "../../utils/pda";
 import { MANAGER_AUTHORITY } from "./params";
-import { log, program, run, wallet } from "./setup";
+import { log, program, requireParam, run, wallet } from "./setup";
 
 describe("hedge_vault", () => {
   it("config_add_manager", async () => {
+    requireParam("MANAGER_AUTHORITY", MANAGER_AUTHORITY);
     log("Manager", getManagerPda(MANAGER_AUTHORITY));
 
     const ix = await program.methods
