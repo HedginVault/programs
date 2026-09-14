@@ -46,9 +46,11 @@ flowchart LR
   ask the chain.
 - **Writes.** Every `POST /api/tx/*` loads a `VaultCtx`, builds instructions, checks
   `assertAuthority` for manager-only actions, then `assemble()` compiles a v0 message, **simulates
-  it**, and returns base64. The server never signs; the wallet does, and sends to
-  `NEXT_PUBLIC_RPC_URL`. A failed simulation becomes a `422` with the decoded Anchor error code and
-  the program logs, so the user sees `DepositCapReached`, not "transaction reverted".
+  it**, and returns base64. The server never signs; the wallet does (`signTransaction` only), then
+  the browser posts the signed bytes to `POST /api/tx/send`, which relays them through the server's
+  `RPC_URL`, and polls `GET /api/tx/status` for confirmation. The browser holds no RPC endpoint at
+  all. A failed simulation becomes a `422` with the decoded Anchor error code and the program logs,
+  so the user sees `DepositCapReached`, not "transaction reverted".
 - **Abuse control.** Every `POST /api/tx/**` builder and `GET /api/jupiter/quote` costs RPC or a
   third-party call, so both pass through an in-process per-IP token bucket
   (`src/server/ratelimit.ts`, 30 requests / 10 s) and answer `429 RateLimited` past it. The quote
