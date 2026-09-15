@@ -5,12 +5,12 @@ as the protocol's `nav_updater`. No UI. Every run is recorded in Postgres.
 
 ## What it does
 
-Every `TICK_INTERVAL_SECS` the keeper:
+Every minute the keeper:
 
 1. Reads `Config`, checks its key is still the `nav_updater`, checks its SOL balance, and skips the
-   tick if the protocol is paused (unless `POST_WHILE_PAUSED=true`).
+   tick if the protocol is paused.
 2. Reads every vault. A vault is due when its `nav_epoch` is behind the current epoch
-   (`unix_ts / 86400`) and the epoch started more than `EPOCH_POST_OFFSET_SECS` ago.
+   (`unix_ts / 86400`) and the epoch started more than five minutes ago.
 3. For each due vault, values it, simulates `nav_update(total_assets)`, and sends it only on a
    clean simulation. The outcome is upserted into `nav_runs` and alerted on status change.
 
@@ -46,7 +46,7 @@ The keeper never calls `nav_override` and never resolves requests.
 ### Alerts
 
 Structured JSON logs always; `ALERT_WEBHOOK_URL` gets a JSON POST for `warn` and `error`
-(`ALERT_INFO=true` adds successful posts). Reasons: `needs_override`, `run_failed`, `overdue`
+(successful posts are logged only). Reasons: `needs_override`, `run_failed`, `overdue`
 (≥ 2 epochs behind), `protocol_paused`, `low_sol`, `updater_mismatch`, `posted`. An alert fires
 when a vault's status or error changes, not on every retry.
 
@@ -56,15 +56,9 @@ when a vault's status or error changes, not on every retry.
 cd keeper
 yarn install
 yarn sync-idl            # after every `anchor build`
-cp .env.example .env     # fill RPC_URL, KEEPER_KEYPAIR, DATABASE_URL
+cp .env.example .env     # fill in the values below
 yarn dev                 # tsx, or: yarn build && yarn start
 ```
-
-`KEEPER_KEYPAIR` is the JSON array of 64 numbers from a Solana keypair file, e.g.
-`KEEPER_KEYPAIR=$(cat ~/.config/solana/updater.json)`.
-
-Start with `DRY_RUN=true`: the keeper simulates every due vault and writes `dry_run` rows without
-sending anything. Flip it off once the breakdowns look right.
 
 Docker:
 
@@ -77,21 +71,19 @@ Migrations in `migrations/` apply automatically at startup.
 
 ## Environment
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `RPC_URL` | required | reads, simulation, send |
-| `KEEPER_KEYPAIR` | required | JSON array of 64 u8, the `nav_updater` secret key |
-| `DATABASE_URL` | required | Postgres connection string |
-| `TICK_INTERVAL_SECS` | 60 | loop period |
-| `EPOCH_POST_OFFSET_SECS` | 300 | wait after an epoch boundary before posting |
-| `MIN_SOL_BALANCE` | 0.05 | `low_sol` threshold |
-| `POST_WHILE_PAUSED` | false | post even when the protocol is paused |
-| `DRY_RUN` | false | simulate and record only |
-| `ALERT_WEBHOOK_URL` | unset | JSON POST target |
-| `ALERT_INFO` | false | also webhook successful posts |
-| `JUPITER_API_HOST` | lite-api.jup.ag (api.jup.ag with a key) | price API |
-| `JUPITER_API_KEY` | unset | `x-api-key` |
-| `PROGRAM_ID` | from IDL | devnet override |
+| Variable | Purpose |
+| --- | --- |
+| `RPC_URL` | reads, simulation, send |
+| `KEEPER_KEYPAIR` | JSON array of 64 u8, the `nav_updater` secret key: `$(cat ~/.config/solana/keeper.json)` |
+| `DATABASE_URL` | Postgres connection string |
+| `PROGRAM_ID` | hedge_vault program id, prefilled in `.env.example` |
+| `JUPITER_API_KEY` | key for `api.jup.ag`, used for token prices |
+| `DRY_RUN` | `true` simulates and records without sending. Start there, flip to `false` once the breakdowns look right |
+| `ALERT_WEBHOOK_URL` | optional JSON POST target for warn/error alerts |
+
+Tuning that is not expected to change lives as constants at the top of `src/config.ts`: 60 s
+tick, 5 min wait after each epoch boundary, 0.05 SOL low-balance threshold, no posting while the
+protocol is paused, no webhook for successful posts.
 
 ## Layout
 

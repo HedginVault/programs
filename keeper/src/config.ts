@@ -1,19 +1,26 @@
 import { Keypair } from "@solana/web3.js";
 
+/** Loop period. */
+export const TICK_INTERVAL_SECS = 60;
+/** Wait after an epoch boundary before posting, absorbs chain clock lag. */
+export const EPOCH_POST_OFFSET_SECS = 300;
+/** `low_sol` alert threshold for the updater key, in SOL. */
+export const MIN_SOL_BALANCE = 0.05;
+/** Skip posting while the protocol status is Paused; a pause may be a reaction to bad pricing. */
+export const POST_WHILE_PAUSED = false;
+/** Forward successful posts to the webhook as well as warn/error alerts. */
+export const ALERT_INFO = false;
+/** Jupiter price API host; the key is required. */
+export const JUPITER_API_HOST = "https://api.jup.ag";
+
 export interface KeeperConfig {
   rpcUrl: string;
   keypair: Keypair;
   databaseUrl: string;
-  tickIntervalSecs: number;
-  epochPostOffsetSecs: number;
-  minSolBalance: number;
-  postWhilePaused: boolean;
+  programId: string;
+  jupiterApiKey: string;
   dryRun: boolean;
   alertWebhookUrl?: string;
-  alertInfo: boolean;
-  jupiterApiHost: string;
-  jupiterApiKey?: string;
-  programId?: string;
 }
 
 const str = (env: NodeJS.ProcessEnv, key: string) => env[key]?.trim() || undefined;
@@ -22,14 +29,6 @@ function required(env: NodeJS.ProcessEnv, key: string): string {
   const v = str(env, key);
   if (!v) throw new Error(`${key} is required`);
   return v;
-}
-
-function num(env: NodeJS.ProcessEnv, key: string, fallback: number): number {
-  const v = str(env, key);
-  if (v === undefined) return fallback;
-  const n = Number(v);
-  if (!Number.isFinite(n) || n < 0) throw new Error(`${key} must be a non-negative number`);
-  return n;
 }
 
 const bool = (env: NodeJS.ProcessEnv, key: string) => (str(env, key) ?? "false").toLowerCase() === "true";
@@ -49,20 +48,13 @@ function keypair(env: NodeJS.ProcessEnv): Keypair {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): KeeperConfig {
-  const jupiterApiKey = str(env, "JUPITER_API_KEY");
   return {
     rpcUrl: required(env, "RPC_URL"),
     keypair: keypair(env),
     databaseUrl: required(env, "DATABASE_URL"),
-    tickIntervalSecs: num(env, "TICK_INTERVAL_SECS", 60),
-    epochPostOffsetSecs: num(env, "EPOCH_POST_OFFSET_SECS", 300),
-    minSolBalance: num(env, "MIN_SOL_BALANCE", 0.05),
-    postWhilePaused: bool(env, "POST_WHILE_PAUSED"),
+    programId: required(env, "PROGRAM_ID"),
+    jupiterApiKey: required(env, "JUPITER_API_KEY"),
     dryRun: bool(env, "DRY_RUN"),
     alertWebhookUrl: str(env, "ALERT_WEBHOOK_URL"),
-    alertInfo: bool(env, "ALERT_INFO"),
-    jupiterApiHost: str(env, "JUPITER_API_HOST") ?? (jupiterApiKey ? "https://api.jup.ag" : "https://lite-api.jup.ag"),
-    jupiterApiKey,
-    programId: str(env, "PROGRAM_ID"),
   };
 }

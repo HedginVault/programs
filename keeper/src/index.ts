@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { Alerter } from "./alerts";
 import { Chain } from "./chain";
-import { loadConfig } from "./config";
+import { ALERT_INFO, EPOCH_POST_OFFSET_SECS, JUPITER_API_HOST, loadConfig, MIN_SOL_BALANCE, POST_WHILE_PAUSED, TICK_INTERVAL_SECS } from "./config";
 import { Db } from "./db";
 import { log } from "./log";
 import { runVault, type RunnerDeps } from "./runner";
@@ -28,11 +28,11 @@ async function main() {
     log.error("keypair is not the on-chain nav_updater", { keypair: cfg.keypair.publicKey.toBase58(), navUpdater: config.navUpdater.toBase58() });
     process.exit(1);
   }
-  const alerter = new Alerter({ webhookUrl: cfg.alertWebhookUrl, info: cfg.alertInfo });
+  const alerter = new Alerter({ webhookUrl: cfg.alertWebhookUrl, info: ALERT_INFO });
   const deps: RunnerDeps = {
     chain,
     positions: new DlmmReader(chain),
-    pricer: new JupiterPricer({ host: cfg.jupiterApiHost, apiKey: cfg.jupiterApiKey }),
+    pricer: new JupiterPricer({ host: JUPITER_API_HOST, apiKey: cfg.jupiterApiKey }),
     db,
     alerter,
     keypair: cfg.keypair,
@@ -43,7 +43,7 @@ async function main() {
     programId: chain.programId.toBase58(),
     genesis: await chain.connection.getGenesisHash(),
     dryRun: cfg.dryRun,
-    tickIntervalSecs: cfg.tickIntervalSecs,
+    tickIntervalSecs: TICK_INTERVAL_SECS,
   });
 
   let stopping = false;
@@ -56,11 +56,11 @@ async function main() {
 
   while (!stopping) {
     try {
-      await tick(deps, cfg.epochPostOffsetSecs, cfg.minSolBalance, cfg.postWhilePaused, () => stopping);
+      await tick(deps, EPOCH_POST_OFFSET_SECS, MIN_SOL_BALANCE, POST_WHILE_PAUSED, () => stopping);
     } catch (e) {
       log.error("tick failed", { error: e instanceof Error ? e.message : String(e) });
     }
-    if (!stopping) await sleep(cfg.tickIntervalSecs * 1000);
+    if (!stopping) await sleep(TICK_INTERVAL_SECS * 1000);
   }
   await db.close();
   log.info("keeper stopped");
