@@ -6,7 +6,12 @@
     "app:install": "yarn --cwd app install",
     "app:sync-idl": "yarn --cwd app sync-idl",
     "app:dev": "yarn --cwd app dev",
-    "app:build": "yarn --cwd app build"
+    "app:build": "yarn --cwd app build",
+    "keeper:install": "yarn --cwd keeper install",
+    "keeper:sync-idl": "yarn --cwd keeper sync-idl",
+    "keeper:build": "yarn --cwd keeper build",
+    "keeper:dev": "yarn --cwd keeper dev",
+    "keeper:test": "yarn --cwd keeper test"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
