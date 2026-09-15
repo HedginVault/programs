@@ -71,6 +71,7 @@ impl<'info> JupiterSwap<'info> {
             destination_mint,
             vault_source_token_account,
             vault_destination_token_account,
+            source_token_program,
             destination_token_program,
             event_authority,
             jupiter_program,
@@ -158,7 +159,8 @@ impl<'info> JupiterSwap<'info> {
             destination_mint: destination_mint.to_account_info(),
             destination_token_account: vault_destination_token_account.to_account_info(),
             token_account_authority: vault_acc_info,
-            token_program: destination_token_program.to_account_info(),
+            source_token_program: source_token_program.to_account_info(),
+            destination_token_program: destination_token_program.to_account_info(),
         };
 
         jupiter_swap.swap(&swap_data, ctx.remaining_accounts, vault_seeds)?;

@@ -114,7 +114,8 @@ pub fn max_amount_in(quoted_in_amount: u64, max_slippage_bps: u16) -> Result<u64
 }
 
 pub struct JupiterSwapCpi<'info> {
-    pub token_program: AccountInfo<'info>,
+    pub source_token_program: AccountInfo<'info>,
+    pub destination_token_program: AccountInfo<'info>,
     pub token_account_authority: AccountInfo<'info>,
     pub source_token_account: AccountInfo<'info>,
     pub destination_token_account: AccountInfo<'info>,
@@ -154,10 +155,20 @@ impl<'info> JupiterSwapCpi<'info> {
         remaining_accounts: &[AccountInfo<'info>],
         signer_seeds: &[&[u8]],
     ) -> Result<()> {
+        let token_programs = [&self.source_token_program, &self.destination_token_program];
+        // Jupiter always takes SPL Token as `token_program` and moves Token-2022 legs through the
+        // optional `token_2022_program` slot, left as `None` when neither leg is Token-2022
+        let token_program = anchor_spl::token::ID;
+        let token_2022_program = token_programs
+            .into_iter()
+            .find(|program| program.key() == anchor_spl::token_2022::ID)
+            .map_or_else(|| self.jupiter_program.key(), |program| program.key());
+
         let (account_infos, accounts) = match SwapVariant::from_swap_data(swap_data)? {
             SwapVariant::ExactOutRoute => {
                 let mut account_infos = vec![
-                    self.token_program.to_account_info(),
+                    self.source_token_program.to_account_info(),
+                    self.destination_token_program.to_account_info(),
                     self.token_account_authority.to_account_info(),
                     self.source_token_account.to_account_info(),
                     self.destination_token_account.to_account_info(),
@@ -173,7 +184,7 @@ impl<'info> JupiterSwapCpi<'info> {
                 );
 
                 let mut accounts = vec![
-                    AccountMeta::new_readonly(self.token_program.key(), false), // token program
+                    AccountMeta::new_readonly(token_program, false), // token program
                     AccountMeta::new_readonly(self.token_account_authority.key(), true), // user transfer authority
                     AccountMeta::new(self.source_token_account.key(), false), // user source token account
                     AccountMeta::new(self.destination_token_account.key(), false), // user destination token account
@@ -181,7 +192,7 @@ impl<'info> JupiterSwapCpi<'info> {
                     AccountMeta::new_readonly(self.source_mint.key(), false),     // source mint
                     AccountMeta::new_readonly(self.destination_mint.key(), false), // destination mint
                     AccountMeta::new_readonly(self.jupiter_program.key(), false), // [optional] platform fee account
-                    AccountMeta::new_readonly(self.jupiter_program.key(), false), // [optional] token 2022 program
+                    AccountMeta::new_readonly(token_2022_program, false), // [optional] token 2022 program
                     AccountMeta::new_readonly(self.event_authority.key(), false), // event authority
                     AccountMeta::new_readonly(self.jupiter_program.key(), false), // jupiter program
                 ];
@@ -195,7 +206,8 @@ impl<'info> JupiterSwapCpi<'info> {
             }
             SwapVariant::Route => {
                 let mut account_infos = vec![
-                    self.token_program.to_account_info(),
+                    self.source_token_program.to_account_info(),
+                    self.destination_token_program.to_account_info(),
                     self.token_account_authority.to_account_info(),
                     self.source_token_account.to_account_info(),
                     self.destination_token_account.to_account_info(),
@@ -210,7 +222,7 @@ impl<'info> JupiterSwapCpi<'info> {
                 );
 
                 let mut accounts = vec![
-                    AccountMeta::new_readonly(self.token_program.key(), false), // token program
+                    AccountMeta::new_readonly(token_program, false), // token program
                     AccountMeta::new_readonly(self.token_account_authority.key(), true), // user transfer authority
                     AccountMeta::new(self.source_token_account.key(), false), // user source token account
                     AccountMeta::new(self.destination_token_account.key(), false), // user destination token account
@@ -230,7 +242,8 @@ impl<'info> JupiterSwapCpi<'info> {
             }
             SwapVariant::SharedAccountsExactOutRoute | SwapVariant::SharedAccountsRoute => {
                 let mut account_infos = vec![
-                    self.token_program.to_account_info(),
+                    self.source_token_program.to_account_info(),
+                    self.destination_token_program.to_account_info(),
                     remaining_accounts[0].to_account_info(),
                     self.token_account_authority.to_account_info(),
                     self.source_token_account.to_account_info(),
@@ -249,7 +262,7 @@ impl<'info> JupiterSwapCpi<'info> {
                 );
 
                 let mut accounts = vec![
-                    AccountMeta::new_readonly(self.token_program.key(), false), // token program
+                    AccountMeta::new_readonly(token_program, false), // token program
                     AccountMeta::new_readonly(remaining_accounts[0].key(), false), // program authority
                     AccountMeta::new_readonly(self.token_account_authority.key(), true), // user transfer authority
                     AccountMeta::new(self.source_token_account.key(), false), // source token account
@@ -259,7 +272,7 @@ impl<'info> JupiterSwapCpi<'info> {
                     AccountMeta::new_readonly(self.source_mint.key(), false),      // source mint
                     AccountMeta::new_readonly(self.destination_mint.key(), false), // destination mint
                     AccountMeta::new_readonly(self.jupiter_program.key(), false), // [optional] platform fee account
-                    AccountMeta::new_readonly(self.jupiter_program.key(), false), // [optional] token 2022 program
+                    AccountMeta::new_readonly(token_2022_program, false), // [optional] token 2022 program
                     AccountMeta::new_readonly(self.event_authority.key(), false), // event authority
                     AccountMeta::new_readonly(self.jupiter_program.key(), false), // jupiter program
                 ];
