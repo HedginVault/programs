@@ -20,7 +20,7 @@ describe("Db.upsertRun", () => {
     const { client, calls } = fakeClient([{ rows: [{ status: "failed", last_error: "x", attempts: 2 }] }, { rows: [] }]);
     const db = new Db(client);
     const { previous } = await db.upsertRun({
-      vault: "v", epoch: 5, status: "posted", totalAssets: 10n, idleBalance: 3n, breakdown: [], navBefore: 1_000_000_000n, navAfter: 1_010_000_000n, signature: "sig",
+      vault: "v", epoch: 5, status: "posted", totalAssets: 10n, idleBalance: 3n, breakdown: [], navBefore: 1_000_000_000n, navAfter: 1_010_000_000n, signature: "sig", slot: 42,
     });
     expect(previous).toEqual({ status: "failed", last_error: "x", attempts: 2 });
     expect(calls[0].text).toMatch(/select status, last_error, attempts from nav_runs/i);
@@ -28,14 +28,15 @@ describe("Db.upsertRun", () => {
     expect(calls[1].text).toMatch(/insert into nav_runs/i);
     expect(calls[1].text).toMatch(/on conflict \(vault, epoch\) do update/i);
     expect(calls[1].text).toMatch(/attempts = nav_runs\.attempts \+ 1/i);
-    expect(calls[1].values).toEqual(["v", 5, "posted", "10", "3", "[]", "1000000000", "1010000000", "sig", null]);
+    expect(calls[1].text).toMatch(/snapshot_slot = coalesce\(excluded\.snapshot_slot, nav_runs\.snapshot_slot\)/i);
+    expect(calls[1].values).toEqual(["v", 5, "posted", "10", "3", "[]", "1000000000", "1010000000", "sig", null, 42]);
   });
 
   it("passes nulls for absent optional fields", async () => {
     const { client, calls } = fakeClient([{ rows: [] }, { rows: [] }]);
     const { previous } = await new Db(client).upsertRun({ vault: "v", epoch: 1, status: "failed", navBefore: 1n, error: "missing_price:m" });
     expect(previous).toBeNull();
-    expect(calls[1].values).toEqual(["v", 1, "failed", null, null, null, "1", null, null, "missing_price:m"]);
+    expect(calls[1].values).toEqual(["v", 1, "failed", null, null, null, "1", null, null, "missing_price:m", null]);
   });
 });
 

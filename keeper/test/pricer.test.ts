@@ -8,20 +8,16 @@ function fakeFetch(body: Record<string, { usdPrice: number } | null>, ok = true)
 }
 
 describe("JupiterPricer", () => {
-  it("fetches prices in one call and caches them", async () => {
+  it("fetches every mint in one call, uncached", async () => {
     const fetchFn = fakeFetch({ [A]: { usdPrice: 1.5 }, [B]: null });
-    let t = 0;
-    const p = new JupiterPricer({ host: "https://j", fetchFn, now: () => t, ttlMs: 1000 });
+    const p = new JupiterPricer({ host: "https://j", fetchFn });
     const first = await p.prices([A, B, A]);
     expect(first.get(A)).toBe(1.5);
     expect(first.has(B)).toBe(false);
     expect(fetchFn).toHaveBeenCalledTimes(1);
     expect((fetchFn as any).mock.calls[0][0]).toBe(`https://j/price/v3?ids=${A},${B}`);
     await p.prices([A, B]);
-    expect(fetchFn).toHaveBeenCalledTimes(1); // cached, including the null
-    t = 2000;
-    await p.prices([A]);
-    expect(fetchFn).toHaveBeenCalledTimes(2); // expired
+    expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
   it("chunks requests by 50", async () => {

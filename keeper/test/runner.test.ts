@@ -16,7 +16,7 @@ function deps(previous: any = null) {
   const upsertRun = vi.fn(async () => ({ previous }));
   const send = vi.fn(async () => {});
   const d: RunnerDeps = {
-    chain: {} as any, positions: {} as any, pricer: {} as any, keypair: Keypair.generate(), dryRun: false,
+    chain: {} as any, pricer: {} as any, keypair: Keypair.generate(), dryRun: false,
     db: { upsertRun } as any,
     alerter: { send, fire: vi.fn(async () => {}) } as any,
   };
@@ -27,12 +27,12 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("runVault", () => {
   it("values, posts, records and alerts on success", async () => {
-    (valueVault as any).mockResolvedValue({ vault: vault.toBase58(), epoch: 2, totalAssets: 500n, idleBalance: 100n, depositPriceUsd: 1, holdings: [] });
+    (valueVault as any).mockResolvedValue({ vault: vault.toBase58(), epoch: 2, totalAssets: 500n, idleBalance: 100n, depositPriceUsd: 1, holdings: [], slot: 42 });
     (postNav as any).mockResolvedValue({ status: "posted", signature: "sig", navAfter: 1_010_000_000n });
     const { d, upsertRun, send } = deps();
     expect(await runVault(d, vault, account, 2, false)).toBe("posted");
     expect((postNav as any).mock.calls[0][0]).toMatchObject({ totalAssets: 500n, epoch: 2, dryRun: false });
-    expect(upsertRun).toHaveBeenCalledWith(expect.objectContaining({ vault: vault.toBase58(), epoch: 2, status: "posted", totalAssets: 500n, idleBalance: 100n, navBefore: 1_000_000_000n, navAfter: 1_010_000_000n, signature: "sig" }));
+    expect(upsertRun).toHaveBeenCalledWith(expect.objectContaining({ vault: vault.toBase58(), epoch: 2, status: "posted", totalAssets: 500n, idleBalance: 100n, navBefore: 1_000_000_000n, navAfter: 1_010_000_000n, signature: "sig", slot: 42 }));
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ reason: "posted" }));
   });
 

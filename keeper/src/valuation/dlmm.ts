@@ -1,11 +1,16 @@
-import type { PublicKey } from "@solana/web3.js";
 import * as sdk from "@meteora-ag/dlmm";
-import type { Chain } from "../chain";
+import type { Mint } from "@solana/spl-token";
+import type { AccountInfo, Connection, PublicKey } from "@solana/web3.js";
+import BN from "bn.js";
+import { ValuationError } from "./errors";
 
 // The CJS build replaces `module.exports` with the DLMM class and copies the named exports onto
 // it, so `.default` may be undefined; accept both shapes.
 type Sdk = typeof import("@meteora-ag/dlmm");
 const DLMM = ((sdk as unknown as { default?: Sdk["default"] }).default ?? sdk) as unknown as Sdk["default"];
+
+export type DlmmProgram = ReturnType<Sdk["createProgram"]>;
+export const createDlmmProgram = (connection: Connection): DlmmProgram => sdk.createProgram(connection);
 
 export interface DlmmPositionAmounts {
   lbPair: string;
@@ -17,49 +22,81 @@ export interface DlmmPositionAmounts {
   feeY: bigint;
 }
 
-export interface PositionReader {
-  /** Amounts per position pubkey. A position whose account does not exist is absent. */
-  read(positions: PublicKey[]): Promise<Map<string, DlmmPositionAmounts>>;
+/** What the lookup learned about a position; the snapshot must still match it. */
+export interface PositionPlan {
+  position: PublicKey;
+  lbPair: PublicKey;
+  lowerBinId: number;
+  upperBinId: number;
+  /** Every bin array the range covers. */
+  binArrays: PublicKey[];
+  tokenXMint: PublicKey;
+  tokenYMint: PublicKey;
 }
 
-type PositionAccount = { lbPair: PublicKey };
+export type AccountMap = Map<string, AccountInfo<Buffer> | null>;
 
-/**
- * One batched read of the position accounts (to learn each lbPair), one `DLMM.createMultiple` for
- * the distinct pools, then one `getPosition` per position for bin amounts and pending fees.
- */
-export class DlmmReader implements PositionReader {
-  constructor(private readonly chain: Chain) {}
+export function planPosition(program: DlmmProgram, position: PublicKey, info: AccountInfo<Buffer>): Omit<PositionPlan, "tokenXMint" | "tokenYMint"> {
+  const p = sdk.wrapPosition(program, position, info);
+  return { position, lbPair: p.lbPair(), lowerBinId: p.lowerBinId().toNumber(), upperBinId: p.upperBinId().toNumber(), binArrays: p.getBinArrayKeysCoverage(program.programId) };
+}
 
-  async read(positions: PublicKey[]): Promise<Map<string, DlmmPositionAmounts>> {
-    const out = new Map<string, DlmmPositionAmounts>();
-    if (positions.length === 0) return out;
-    const infos = await this.chain.fetchAccountInfos(positions);
-    const live = positions.flatMap((position, i) => {
-      const info = infos[i];
-      if (!info) return [];
-      const account = this.chain.program.coder.accounts.decode<PositionAccount>("positionV2", info.data);
-      return [{ position, lbPair: account.lbPair }];
-    });
-    if (live.length === 0) return out;
+export function decodeLbPairMints(program: DlmmProgram, info: AccountInfo<Buffer>): { tokenXMint: PublicKey; tokenYMint: PublicKey } {
+  const { tokenXMint, tokenYMint } = sdk.decodeAccount<sdk.LbPair>(program, "lbPair", info.data);
+  return { tokenXMint, tokenYMint };
+}
 
-    const lbPairs = [...new Map(live.map((l) => [l.lbPair.toBase58(), l.lbPair])).values()];
-    const pools = new Map((await DLMM.createMultiple(this.chain.connection, lbPairs)).map((p) => [p.pubkey.toBase58(), p]));
+export const decodeClock = (info: AccountInfo<Buffer>): sdk.Clock => sdk.ClockLayout.decode(info.data);
 
-    for (const { position, lbPair } of live) {
-      const pool = pools.get(lbPair.toBase58());
-      if (!pool) throw new Error(`DLMM pool ${lbPair.toBase58()} unavailable`);
-      const { positionData } = await pool.getPosition(position);
-      out.set(position.toBase58(), {
-        lbPair: lbPair.toBase58(),
-        tokenX: { mint: pool.tokenX.publicKey.toBase58(), decimals: pool.tokenX.mint.decimals },
-        tokenY: { mint: pool.tokenY.publicKey.toBase58(), decimals: pool.tokenY.mint.decimals },
-        amountX: BigInt(positionData.totalXAmountExcludeTransferFee.toString()),
-        amountY: BigInt(positionData.totalYAmountExcludeTransferFee.toString()),
-        feeX: BigInt(positionData.feeXExcludeTransferFee.toString()),
-        feeY: BigInt(positionData.feeYExcludeTransferFee.toString()),
-      });
-    }
-    return out;
+type ProcessPosition = (
+  program: DlmmProgram,
+  lbPair: sdk.LbPair,
+  clock: sdk.Clock,
+  position: sdk.IPosition,
+  baseMint: Mint,
+  quoteMint: Mint,
+  rewardMint0: Mint | undefined,
+  rewardMint1: Mint | undefined,
+  binArrayMap: Map<string, sdk.BinArray>,
+) => Promise<sdk.PositionData | null>;
+// Private in the SDK typings; it is the math `DLMM.getPosition` runs once its own fetches are done.
+const processPosition = (DLMM as unknown as { processPosition: ProcessPosition }).processPosition.bind(DLMM);
+
+/** Amounts for one position from snapshot accounts, after checking the position still matches its plan. */
+export async function readPosition(program: DlmmProgram, plan: PositionPlan, accounts: AccountMap, clock: sdk.Clock, mintX: Mint, mintY: Mint): Promise<DlmmPositionAmounts> {
+  const key = plan.position.toBase58();
+  const info = accounts.get(key);
+  if (!info) throw new ValuationError(`position_missing:${key}`);
+  const position = sdk.wrapPosition(program, plan.position, info);
+  if (!position.lbPair().equals(plan.lbPair) || position.lowerBinId().toNumber() !== plan.lowerBinId || position.upperBinId().toNumber() !== plan.upperBinId) {
+    throw new ValuationError(`snapshot_drift:position_range:${key}`);
   }
+  const lbPairInfo = accounts.get(plan.lbPair.toBase58());
+  if (!lbPairInfo) throw new ValuationError(`account_missing:${plan.lbPair.toBase58()}`);
+  const lbPair = sdk.decodeAccount<sdk.LbPair>(program, "lbPair", lbPairInfo.data);
+
+  const binArrays = new Map<string, sdk.BinArray>();
+  for (const k of plan.binArrays) {
+    const binArray = accounts.get(k.toBase58());
+    if (binArray) binArrays.set(k.toBase58(), sdk.decodeAccount<sdk.BinArray>(program, "binArray", binArray.data));
+  }
+  // The SDK reads an absent bin array as empty bins, which would value the liquidity in it at zero.
+  position.liquidityShares().forEach((share, i) => {
+    if (share.isZero()) return;
+    const index = sdk.binIdToBinArrayIndex(new BN(plan.lowerBinId + i));
+    const binArray = sdk.deriveBinArray(plan.lbPair, index, program.programId)[0].toBase58();
+    if (!binArrays.has(binArray)) throw new ValuationError(`bin_array_missing:${binArray}`);
+  });
+
+  const data = await processPosition(program, lbPair, clock, position, mintX, mintY, undefined, undefined, binArrays);
+  const amount = (v: { toString(): string } | undefined) => BigInt(v?.toString() ?? "0");
+  return {
+    lbPair: plan.lbPair.toBase58(),
+    tokenX: { mint: plan.tokenXMint.toBase58(), decimals: mintX.decimals },
+    tokenY: { mint: plan.tokenYMint.toBase58(), decimals: mintY.decimals },
+    amountX: amount(data?.totalXAmountExcludeTransferFee),
+    amountY: amount(data?.totalYAmountExcludeTransferFee),
+    feeX: amount(data?.feeXExcludeTransferFee),
+    feeY: amount(data?.feeYExcludeTransferFee),
+  };
 }

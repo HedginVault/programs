@@ -8,7 +8,6 @@ import { Db } from "./db";
 import { log } from "./log";
 import { runVault, type RunnerDeps } from "./runner";
 import { decide } from "./scheduler";
-import { DlmmReader } from "./valuation/dlmm";
 import { JupiterPricer } from "./valuation/pricer";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -31,7 +30,6 @@ async function main() {
   const alerter = new Alerter({ webhookUrl: cfg.alertWebhookUrl, info: ALERT_INFO });
   const deps: RunnerDeps = {
     chain,
-    positions: new DlmmReader(chain),
     pricer: new JupiterPricer({ host: JUPITER_API_HOST, apiKey: cfg.jupiterApiKey }),
     db,
     alerter,

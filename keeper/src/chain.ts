@@ -3,6 +3,8 @@ import { AccountLayout, MintLayout } from "@solana/spl-token";
 import { Connection, LAMPORTS_PER_SOL, PublicKey, type AccountInfo } from "@solana/web3.js";
 import idl from "../idl/hedge_vault.json";
 import type { HedgeVault } from "../idl/hedge_vault";
+import { log } from "./log";
+import { createDlmmProgram, type DlmmProgram } from "./valuation/dlmm";
 
 export const EPOCH_DURATION = 86_400;
 export const NAV_PRECISION = 1_000_000_000n;
@@ -12,6 +14,12 @@ export const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC
 export type ConfigAccount = IdlAccounts<HedgeVault>["config"];
 export type VaultAccount = IdlAccounts<HedgeVault>["vault"];
 export type StrategyAccount = IdlAccounts<HedgeVault>["strategy"];
+
+/** Accounts read together; `slot` is the context slot of the (first) `getMultipleAccountsInfo`. */
+export interface Snapshot {
+  slot: number;
+  accounts: Map<string, AccountInfo<Buffer> | null>;
+}
 
 export interface MintInfo {
   decimals: number;
@@ -38,6 +46,7 @@ export class Chain {
   private constructor(
     readonly connection: Connection,
     readonly program: Program<HedgeVault>,
+    readonly dlmmProgram: DlmmProgram,
   ) {
     this.programId = program.programId;
   }
@@ -49,7 +58,7 @@ export class Chain {
       { ...(idl as HedgeVault), address: programId ?? idl.address },
       { connection } as Provider,
     );
-    return new Chain(connection, program);
+    return new Chain(connection, program, createDlmmProgram(connection));
   }
 
   private pda(seeds: Buffer[]): PublicKey {
@@ -94,6 +103,24 @@ export class Chain {
     return out;
   }
 
+  /**
+   * All keys in one `getMultipleAccountsInfo`, so every account is read at the same slot. Above 100
+   * keys, later chunks are pinned to the first chunk's slot with `minContextSlot`.
+   */
+  async fetchSnapshot(keys: PublicKey[]): Promise<Snapshot> {
+    const unique = [...new Map(keys.map((k) => [k.toBase58(), k])).values()];
+    const accounts = new Map<string, AccountInfo<Buffer> | null>();
+    let slot: number | undefined;
+    for (let i = 0; i < unique.length; i += MAX_ACCOUNTS_PER_CALL) {
+      const chunk = unique.slice(i, i + MAX_ACCOUNTS_PER_CALL);
+      const { context, value } = await this.connection.getMultipleAccountsInfoAndContext(chunk, slot === undefined ? undefined : { minContextSlot: slot });
+      if (slot === undefined) slot = context.slot;
+      else if (context.slot !== slot) log.warn("snapshot chunk read at a later slot", { slot, chunkSlot: context.slot });
+      chunk.forEach((k, j) => accounts.set(k.toBase58(), value[j]));
+    }
+    return { slot: slot ?? 0, accounts };
+  }
+
   async fetchMintInfos(mints: PublicKey[]): Promise<Map<string, MintInfo>> {
     const unique = [...new Map(mints.map((m) => [m.toBase58(), m])).values()];
     const infos = await this.fetchAccountInfos(unique);
@@ -104,10 +131,6 @@ export class Chain {
       out.set(unique[i].toBase58(), { decimals: mint.decimals, tokenProgram: info.owner });
     });
     return out;
-  }
-
-  async fetchTokenBalances(accounts: PublicKey[]): Promise<bigint[]> {
-    return (await this.fetchAccountInfos(accounts)).map(decodeTokenAmount);
   }
 
   async fetchSolBalance(key: PublicKey): Promise<number> {

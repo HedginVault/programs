@@ -19,6 +19,8 @@ export interface RunRecord {
   navAfter?: bigint;
   signature?: string;
   error?: string;
+  /** Slot of the account snapshot the valuation read. */
+  slot?: number;
 }
 
 export interface RunRow {
@@ -64,8 +66,8 @@ export class Db {
   async upsertRun(r: RunRecord): Promise<{ previous: RunRow | null }> {
     const prev = await this.client.query("select status, last_error, attempts from nav_runs where vault = $1 and epoch = $2", [r.vault, r.epoch]);
     await this.client.query(
-      `insert into nav_runs (vault, epoch, status, total_assets, idle_balance, breakdown, nav_before, nav_after, signature, last_error)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `insert into nav_runs (vault, epoch, status, total_assets, idle_balance, breakdown, nav_before, nav_after, signature, last_error, snapshot_slot)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        on conflict (vault, epoch) do update set
          status = excluded.status,
          attempts = nav_runs.attempts + 1,
@@ -76,6 +78,7 @@ export class Db {
          nav_after = coalesce(excluded.nav_after, nav_runs.nav_after),
          signature = coalesce(excluded.signature, nav_runs.signature),
          last_error = excluded.last_error,
+         snapshot_slot = coalesce(excluded.snapshot_slot, nav_runs.snapshot_slot),
          last_attempt_at = now()`,
       [
         r.vault,
@@ -88,6 +91,7 @@ export class Db {
         str(r.navAfter),
         r.signature ?? null,
         r.error ?? null,
+        r.slot ?? null,
       ],
     );
     return { previous: (prev.rows[0] as RunRow | undefined) ?? null };

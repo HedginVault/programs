@@ -4,13 +4,11 @@ import type { Chain, VaultAccount } from "./chain";
 import type { Db, RunRecord } from "./db";
 import { log } from "./log";
 import { postNav, type RunStatus } from "./post";
-import type { PositionReader } from "./valuation/dlmm";
 import { ValuationError, valueVault } from "./valuation/index";
 import type { Pricer } from "./valuation/pricer";
 
 export interface RunnerDeps {
   chain: Chain;
-  positions: PositionReader;
   pricer: Pricer;
   db: Db;
   alerter: Alerter;
@@ -26,7 +24,7 @@ export async function runVault(deps: RunnerDeps, vault: PublicKey, account: Vaul
 
   try {
     const valuation = await valueVault(deps, vault, account, epoch);
-    log.info("valuation", { vault: key, epoch, totalAssets: valuation.totalAssets, idleBalance: valuation.idleBalance, holdings: valuation.holdings.length });
+    log.info("valuation", { vault: key, epoch, totalAssets: valuation.totalAssets, idleBalance: valuation.idleBalance, holdings: valuation.holdings.length, slot: valuation.slot });
     const outcome = await postNav({ chain: deps.chain, keypair: deps.keypair, vault, account, totalAssets: valuation.totalAssets, epoch, dryRun: deps.dryRun });
     record = {
       vault: key,
@@ -35,6 +33,7 @@ export async function runVault(deps: RunnerDeps, vault: PublicKey, account: Vaul
       totalAssets: valuation.totalAssets,
       idleBalance: valuation.idleBalance,
       breakdown: valuation.holdings,
+      slot: valuation.slot,
       navBefore,
       ...(outcome.status === "posted" ? { signature: outcome.signature, navAfter: outcome.navAfter } : {}),
       ...("error" in outcome ? { error: outcome.error } : {}),
