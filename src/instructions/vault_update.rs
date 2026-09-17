@@ -13,6 +13,8 @@ pub struct VaultUpdateArgs {
     pub min_deposit: Option<u64>,
     pub min_withdrawal_shares: Option<u64>,
     pub status: Option<VaultStatus>,
+    pub deposit_paused: Option<bool>,
+    pub withdrawal_paused: Option<bool>,
 }
 
 #[derive(Accounts)]
@@ -66,6 +68,14 @@ impl<'info> VaultUpdate<'info> {
             vault.status = status;
         }
 
+        if let Some(deposit_paused) = args.deposit_paused {
+            vault.deposit_paused = deposit_paused as u8;
+        }
+
+        if let Some(withdrawal_paused) = args.withdrawal_paused {
+            vault.withdrawal_paused = withdrawal_paused as u8;
+        }
+
         emit!(VaultUpdated {
             vault: vault_key,
             performance_fee_bps: vault.performance_fee_bps,
@@ -77,6 +87,8 @@ impl<'info> VaultUpdate<'info> {
             min_deposit: vault.min_deposit,
             min_withdrawal_shares: vault.min_withdrawal_shares,
             status: vault.status,
+            deposit_paused: vault.is_deposit_paused(),
+            withdrawal_paused: vault.is_withdrawal_paused(),
         });
 
         Ok(())

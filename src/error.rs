@@ -147,4 +147,10 @@ pub enum HedgeVaultError {
     // Meteora
     #[msg("Position address does not match")]
     InvalidPosition,
+
+    // Vault, appended so earlier error codes stay stable
+    #[msg("Vault deposits are paused by the manager")]
+    VaultDepositPaused,
+    #[msg("Vault withdrawals are paused by the manager")]
+    VaultWithdrawalPaused,
 }
