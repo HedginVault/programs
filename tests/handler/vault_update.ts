@@ -10,6 +10,8 @@ describe("hedge_vault", () => {
       minDeposit: null,
       minWithdrawalShares: null,
       status: { normal: {} },
+      depositPaused: null,
+      withdrawalPaused: null,
     };
 
     const ix = await program.methods

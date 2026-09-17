@@ -81,6 +81,8 @@ pub struct VaultUpdated {
     pub min_deposit: u64,
     pub min_withdrawal_shares: u64,
     pub status: VaultStatus,
+    pub deposit_paused: bool,
+    pub withdrawal_paused: bool,
 }
 
 #[event]

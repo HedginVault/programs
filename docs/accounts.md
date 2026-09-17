@@ -219,6 +219,8 @@ NAV safety checks, in order: `total_assets >= vault_token_account.amount` (both 
 | `pending_performance_fee_bps`, `pending_management_fee_bps` | `u16` | Fee pair scheduled by `vault_update` when either fee increases. |
 | `fee_effective_ts` | `i64` | `nav_update` applies the pending pair once `now >= fee_effective_ts`, after charging the period at the old rate. Decreases apply immediately. 0 = nothing pending. |
 | `status` | `VaultStatus` | `Normal` (0), `Paused` (1), `ReduceOnly` (2). Starts `Normal`. |
+| `deposit_paused` | `u8` | Nonzero blocks `deposit_request_create` and `deposit_request_resolve`, independent of `status`. Set by the manager via `vault_update`. Cancel and reject stay open. |
+| `withdrawal_paused` | `u8` | Same for `withdrawal_request_create` and `withdrawal_request_resolve`. |
 | `bump` | `u8` | PDA bump. |
 | `version` | `u8` | Layout version, currently 1. |
 

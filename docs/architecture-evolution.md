@@ -204,7 +204,9 @@ title Vault v1 - 424 bytes
 304: "s"
 305: "b"
 306: "v"
-307-311: "pad"
+307: "dp"
+308: "wp"
+309-311: "pad"
 312-423: "padding1 - 112 bytes reserved"
 ```
 

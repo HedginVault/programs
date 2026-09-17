@@ -93,6 +93,7 @@ impl<'info> DepositRequestCreate<'info> {
 
         Vault::validate_address(vault_seeds, vault_key)?;
         vault.is_vault_operational()?;
+        vault.validate_deposit_not_paused()?;
         vault.validate_deposit_mint(deposit_mint.key())?;
         vault.validate_share_mint(share_mint.key())?;
 

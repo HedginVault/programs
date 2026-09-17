@@ -110,7 +110,11 @@ pub struct Vault {
     pub bump: u8,
     /// Layout version, see [VAULT_VERSION].
     pub version: u8,
-    padding0: [u8; 5],
+    /// Nonzero when the manager has paused deposit requests and their resolution.
+    pub deposit_paused: u8,
+    /// Nonzero when the manager has paused withdrawal requests and their resolution.
+    pub withdrawal_paused: u8,
+    padding0: [u8; 3],
     /// 312..320, reserved for `epoch_duration`.
     reserved0: [u8; 8],
     /// Smallest deposit accepted per request, denoted in deposit mint. Zero disables the check.
@@ -159,7 +163,9 @@ impl Vault {
             status: VaultStatus::Normal,
             bump: args.bump,
             version: VAULT_VERSION,
-            padding0: [0; 5],
+            deposit_paused: 0,
+            withdrawal_paused: 0,
+            padding0: [0; 3],
             reserved0: [0; 8],
             min_deposit: args.min_deposit,
             min_withdrawal_shares: args.min_withdrawal_shares,
@@ -237,6 +243,29 @@ impl Vault {
         validate!(
             self.status != VaultStatus::Paused,
             HedgeVaultError::VaultNotWithdrawable
+        )?;
+
+        Ok(())
+    }
+
+    pub fn is_deposit_paused(&self) -> bool {
+        self.deposit_paused != 0
+    }
+
+    pub fn is_withdrawal_paused(&self) -> bool {
+        self.withdrawal_paused != 0
+    }
+
+    pub fn validate_deposit_not_paused(&self) -> Result<()> {
+        validate!(!self.is_deposit_paused(), HedgeVaultError::VaultDepositPaused)?;
+
+        Ok(())
+    }
+
+    pub fn validate_withdrawal_not_paused(&self) -> Result<()> {
+        validate!(
+            !self.is_withdrawal_paused(),
+            HedgeVaultError::VaultWithdrawalPaused
         )?;
 
         Ok(())
@@ -583,6 +612,8 @@ mod tests {
 
         // account offsets in docs/architecture-evolution.md 3.5 include the 8-byte discriminator
         assert_eq!(core::mem::offset_of!(Vault, reserved_keys) + 8, 80);
+        assert_eq!(core::mem::offset_of!(Vault, deposit_paused) + 8, 307);
+        assert_eq!(core::mem::offset_of!(Vault, withdrawal_paused) + 8, 308);
         assert_eq!(core::mem::offset_of!(Vault, min_deposit) + 8, 320);
         assert_eq!(core::mem::offset_of!(Vault, min_withdrawal_shares) + 8, 328);
         assert_eq!(core::mem::offset_of!(Vault, fee_effective_ts) + 8, 360);
@@ -605,6 +636,28 @@ mod tests {
 
         v.decrement_open_strategies().unwrap();
         assert_err(v.decrement_open_strategies(), HedgeVaultError::MathOverflow);
+    }
+
+    #[test]
+    fn deposit_and_withdrawal_pause_are_independent() {
+        let mut v = new_vault(0, 0);
+        v.validate_deposit_not_paused().unwrap();
+        v.validate_withdrawal_not_paused().unwrap();
+
+        v.deposit_paused = 1;
+        assert_err(
+            v.validate_deposit_not_paused(),
+            HedgeVaultError::VaultDepositPaused,
+        );
+        v.validate_withdrawal_not_paused().unwrap();
+
+        v.deposit_paused = 0;
+        v.withdrawal_paused = 1;
+        v.validate_deposit_not_paused().unwrap();
+        assert_err(
+            v.validate_withdrawal_not_paused(),
+            HedgeVaultError::VaultWithdrawalPaused,
+        );
     }
 
     #[test]
