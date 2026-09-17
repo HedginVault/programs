@@ -14,6 +14,8 @@ export const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC
 export type ConfigAccount = IdlAccounts<HedgeVault>["config"];
 export type VaultAccount = IdlAccounts<HedgeVault>["vault"];
 export type StrategyAccount = IdlAccounts<HedgeVault>["strategy"];
+export type DepositRequestAccount = IdlAccounts<HedgeVault>["depositRequest"];
+export type WithdrawalRequestAccount = IdlAccounts<HedgeVault>["withdrawalRequest"];
 
 /** Accounts read together; `slot` is the context slot of the (first) `getMultipleAccountsInfo`. */
 export interface Snapshot {
@@ -29,6 +31,8 @@ export interface MintInfo {
 const MAX_ACCOUNTS_PER_CALL = 100;
 // Strategy layout: 8-byte discriminator, then `vault`.
 const STRATEGY_VAULT_OFFSET = 8;
+// Request layout: 8-byte discriminator, `authority`, then `vault`.
+const REQUEST_VAULT_OFFSET = 40;
 
 export function decodeTokenAmount(info: AccountInfo<Buffer> | null): bigint {
   if (!info || info.data.length < AccountLayout.span) return 0n;
@@ -93,6 +97,18 @@ export class Chain {
       { memcmp: { offset: STRATEGY_VAULT_OFFSET, bytes: vault.toBase58() } },
     ]);
     return rows.map((r) => ({ key: r.publicKey, account: r.account })).sort((a, b) => a.account.id - b.account.id);
+  }
+
+  async fetchRequests(vault: PublicKey): Promise<{
+    deposits: { key: PublicKey; account: DepositRequestAccount }[];
+    withdrawals: { key: PublicKey; account: WithdrawalRequestAccount }[];
+  }> {
+    const filter = [{ memcmp: { offset: REQUEST_VAULT_OFFSET, bytes: vault.toBase58() } }];
+    const [deposits, withdrawals] = await Promise.all([this.program.account.depositRequest.all(filter), this.program.account.withdrawalRequest.all(filter)]);
+    return {
+      deposits: deposits.map((r) => ({ key: r.publicKey, account: r.account })),
+      withdrawals: withdrawals.map((r) => ({ key: r.publicKey, account: r.account })),
+    };
   }
 
   async fetchAccountInfos(keys: PublicKey[]): Promise<(AccountInfo<Buffer> | null)[]> {

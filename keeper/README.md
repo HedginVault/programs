@@ -1,7 +1,8 @@
 # Hedge Vault — NAV Keeper
 
-Backend service that values every `hedge_vault` vault once per 24 h epoch and posts `nav_update`
-as the protocol's `nav_updater`. No UI. Every run is recorded in Postgres.
+Backend service that values every `hedge_vault` vault once per 24 h epoch, posts `nav_update`
+as the protocol's `nav_updater`, and settles the deposit and withdrawal requests that the new NAV
+makes ready. No UI. Every NAV run is recorded in Postgres.
 
 ## What it does
 
@@ -14,6 +15,8 @@ Every minute the keeper:
 3. For each due vault, values it from one account snapshot and one price request (below),
    simulates `nav_update(total_assets)`, and sends it only on a clean simulation. The outcome is
    upserted into `nav_runs` and alerted on status change.
+4. Settles every ready request (below), for every vault, whether the NAV came from this keeper or an
+   admin `nav_override`.
 
 ### What counts as an asset
 
@@ -59,7 +62,26 @@ swap it back), otherwise the removed amount is uncounted until one exists.
 | `failed` | valuation or send failed (`last_error` says why) | every tick |
 | `dry_run` | `DRY_RUN=true`, simulated only | every tick |
 
-The keeper never calls `nav_override` and never resolves requests.
+The keeper never calls `nav_override`.
+
+### Settlement
+
+`deposit_request_resolve` and `withdrawal_request_resolve` are permissionless, and a request is
+ready once the vault's `nav_epoch` is past the request's epoch. Every tick, for each vault that is
+not paused and has pending deposits or withdrawal shares, the keeper:
+
+1. Loads the vault's requests and keeps the ready ones. Deposits are skipped while the protocol or
+   vault is reduce-only, or the vault NAV is zero, because the program rejects them.
+2. Orders deposits before withdrawals (deposits add idle cash and raise the epoch outflow cap), each
+   oldest first.
+3. Sends at most 6 resolves of one kind per transaction (a mixed transaction overruns the packet
+   size). If a transaction's simulation fails, those requests go one per transaction, so one bad
+   request cannot hold up the others.
+4. Counts a request as settled only when its account is closed on chain.
+
+The keeper pays transaction fees only; each request's rent goes back to its owner. It never creates
+a user's share or deposit token account. With `DRY_RUN=true` it only simulates. Settlement results
+are logged and alerted, not stored in Postgres.
 
 ### Alerts
 
@@ -67,6 +89,10 @@ Structured JSON logs always; `ALERT_WEBHOOK_URL` gets a JSON POST for `warn` and
 (successful posts are logged only). Reasons: `needs_override`, `run_failed`, `overdue`
 (≥ 2 epochs behind), `protocol_paused`, `low_sol`, `updater_mismatch`, `posted`. An alert fires
 when a vault's status or error changes, not on every retry.
+
+Settlement adds `settle_failed` (warn, one per request, cleared once it settles), `settle_error`
+(warn, one per vault, when loading or sending fails outright) and `settled` / `would_settle` (info,
+per vault). Settlement dedupe is in memory, so an unresolved failure alerts again after a restart.
 
 ## Run
 
@@ -125,6 +151,16 @@ Pricing is behind the `Pricer` interface in `src/valuation/pricer.ts`; a future 
 that one implementation.
 
 ## Runbook
+
+- **`settle_failed` … `EpochOutflowCapReached`**: withdrawals this epoch reached
+  `max_epoch_outflow_bps`. Retried every tick; the rest settle after the next NAV post resets the
+  outflow, or sooner if the admin raises the cap.
+- **`settle_failed` … `InsufficientFunds`**: the vault lacks idle deposit mint for the withdrawal.
+  The manager must free liquidity (swap back or remove liquidity); it settles on the next tick after.
+- **`settle_failed` … `AccountNotInitialized`**: the user closed the share or deposit token account
+  the resolve pays into. They must recreate it; the keeper will not pay for it.
+- **`settle_error`**: loading requests or sending failed for the whole vault (usually RPC). Retried
+  every tick.
 
 - **`needs_override`**: prices moved more than `max_nav_deviation_bps` in one epoch. Check the
   `breakdown` in `nav_runs`, then the admin runs `nav_override` (`anchor run nav-override` with

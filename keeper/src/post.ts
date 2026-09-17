@@ -1,15 +1,9 @@
 import BN from "bn.js";
-import {
-  ComputeBudgetProgram,
-  Keypair,
-  PublicKey,
-  TransactionExpiredBlockheightExceededError,
-  TransactionMessage,
-  VersionedTransaction,
-} from "@solana/web3.js";
+import type { Keypair, PublicKey } from "@solana/web3.js";
 import idl from "../idl/hedge_vault.json";
 import { type Chain, type VaultAccount } from "./chain";
 import { log } from "./log";
+import { buildTx, sendTx, simulateTx } from "./tx";
 
 export type RunStatus = "posted" | "skipped" | "needs_override" | "failed" | "dry_run";
 
@@ -59,10 +53,9 @@ export interface PostArgs {
 }
 
 export async function postNav({ chain, keypair, vault, account, totalAssets, epoch, dryRun }: PostArgs): Promise<PostOutcome> {
-  const { connection, program } = chain;
   const mintInfo = (await chain.fetchMintInfos([account.depositMint])).get(account.depositMint.toBase58())!;
 
-  const ix = await program.methods
+  const ix = await chain.program.methods
     .navUpdate(new BN(totalAssets.toString()))
     .accounts({
       navUpdater: keypair.publicKey,
@@ -74,29 +67,14 @@ export async function postNav({ chain, keypair, vault, account, totalAssets, epo
     })
     .instruction();
 
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-  const message = new TransactionMessage({
-    payerKey: keypair.publicKey,
-    recentBlockhash: blockhash,
-    instructions: [ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_UNITS }), ix],
-  }).compileToV0Message();
-  const tx = new VersionedTransaction(message);
+  const built = await buildTx(chain, keypair.publicKey, [ix], COMPUTE_UNITS);
+  const sim = await simulateTx(chain, built);
+  if (!sim.ok) return classifySimulation(sim.logs, sim.err);
+  if (dryRun) return { status: "dry_run", unitsConsumed: sim.unitsConsumed };
 
-  const sim = await connection.simulateTransaction(tx, { sigVerify: false, replaceRecentBlockhash: true });
-  if (sim.value.err) return classifySimulation(sim.value.logs ?? [], sim.value.err);
-  if (dryRun) return { status: "dry_run", unitsConsumed: sim.value.unitsConsumed ?? 0 };
-
-  tx.sign([keypair]);
-  const signature = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, preflightCommitment: "confirmed" });
+  const { signature, error } = await sendTx(chain, keypair, built);
   log.info("nav_update sent", { vault: vault.toBase58(), epoch, signature });
-
-  try {
-    const conf = await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
-    if (conf.value.err) return { status: "failed", error: `confirm:${JSON.stringify(conf.value.err)}` };
-  } catch (e) {
-    if (!(e instanceof TransactionExpiredBlockheightExceededError)) throw e;
-    log.warn("blockhash expired before confirmation, re-reading vault", { vault: vault.toBase58(), signature });
-  }
+  if (error) return { status: "failed", error };
 
   // The chain decides whether it landed, not the confirmation path.
   const after = await chain.fetchVault(vault);

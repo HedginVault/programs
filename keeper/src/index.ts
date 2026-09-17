@@ -8,6 +8,7 @@ import { Db } from "./db";
 import { log } from "./log";
 import { runVault, type RunnerDeps } from "./runner";
 import { decide } from "./scheduler";
+import { settleVault } from "./settle";
 import { JupiterPricer } from "./valuation/pricer";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -84,12 +85,28 @@ async function tick(deps: RunnerDeps, offsetSecs: number, minSol: number, postWh
   await alerter.fire("paused", null);
 
   const now = Math.floor(Date.now() / 1000);
-  for (const { key, account } of await chain.fetchVaults()) {
+  const vaults = await chain.fetchVaults();
+  let posted = false;
+  for (const { key, account } of vaults) {
     if (stopping()) return;
     const decision = decide(account.navEpoch.toNumber(), now, offsetSecs);
     if (decision.action === "skip") continue;
     log.info("vault due", { vault: key.toBase58(), epoch: decision.epoch, navEpoch: account.navEpoch.toNumber(), overdue: decision.overdue });
-    await runVault(deps, key, account, decision.epoch, decision.overdue);
+    if ((await runVault(deps, key, account, decision.epoch, decision.overdue)) === "posted") posted = true;
+  }
+
+  // A post moves nav_epoch, which is what makes requests resolvable.
+  for (const { key, account } of posted ? await chain.fetchVaults() : vaults) {
+    if (stopping()) return;
+    const vault = key.toBase58();
+    try {
+      await settleVault(deps, key, account, config);
+      await alerter.fire(`settle:${vault}`, null);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      log.error("settlement failed", { vault, error: message });
+      await alerter.fire(`settle:${vault}`, { level: "warn", reason: "settle_error", message, vault });
+    }
   }
 }
 
