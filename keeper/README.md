@@ -113,6 +113,18 @@ docker run --env-file keeper/.env hedge-keeper
 
 Migrations in `migrations/` apply automatically at startup.
 
+Local Postgres:
+
+```sh
+docker compose up -d postgres
+yarn dev
+```
+
+The Compose database uses `postgres://postgres:postgres@localhost:5432/hedge_keeper`,
+matching the default in `.env.example`. Data is persisted in the
+`keeper-postgres-data` volume. Stop the database with `docker compose down`; use
+`docker compose down -v` when you intentionally want to remove the local database.
+
 ## Environment
 
 | Variable | Purpose |
