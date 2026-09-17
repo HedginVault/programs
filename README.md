@@ -2,7 +2,7 @@
 
 Protocol-gated fund management vault on Solana. Whitelisted managers deploy user
 deposits into Meteora DLMM positions and Jupiter swaps. NAV is computed
-off-chain and posted once per 24h epoch by a centralized updater; deposits and
+off-chain and posted once per 4h epoch by a centralized updater; deposits and
 withdrawals are requests resolved at the next posted NAV.
 
 Docs: [design spec](docs/superpowers/specs/2026-09-13-hedge-vault-design.md) ·

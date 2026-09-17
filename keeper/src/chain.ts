@@ -6,7 +6,7 @@ import type { HedgeVault } from "../idl/hedge_vault";
 import { log } from "./log";
 import { createDlmmProgram, type DlmmProgram } from "./valuation/dlmm";
 
-export const EPOCH_DURATION = 86_400;
+export const EPOCH_DURATION = 14_400;
 export const NAV_PRECISION = 1_000_000_000n;
 export const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 export const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");

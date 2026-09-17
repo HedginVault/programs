@@ -20,7 +20,7 @@ pub const NAV_PRECISION: u64 = 1_000_000_000;
 
 /// Duration of a NAV epoch in seconds. NAV is updated at most once per epoch.
 #[constant]
-pub const EPOCH_DURATION: i64 = 86_400; // 24h
+pub const EPOCH_DURATION: i64 = 14_400; // 4h
 
 /// Share of fees claimed from a protocol position that is sent to the treasury.
 #[constant]

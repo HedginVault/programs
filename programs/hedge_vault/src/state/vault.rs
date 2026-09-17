@@ -613,7 +613,7 @@ mod tests {
         v.update_nav(nav_args(0, 0, DAY)).unwrap();
 
         assert_eq!(v.nav_per_share, NAV_PRECISION);
-        assert_eq!(v.nav_epoch, 1);
+        assert_eq!(v.nav_epoch, Vault::epoch(DAY));
         assert_eq!(v.last_nav_ts, DAY);
     }
 

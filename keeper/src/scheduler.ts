@@ -4,7 +4,7 @@ export type Decision =
   | { action: "skip"; reason: "current" | "offset" }
   | { action: "run"; epoch: number; overdue: boolean };
 
-/** Same arithmetic as `Vault::epoch`: unix seconds / 86 400, floored. */
+/** Same arithmetic as `Vault::epoch`: unix seconds / 14 400, floored. */
 export const currentEpoch = (now: number) => Math.floor(now / EPOCH_DURATION);
 
 /**

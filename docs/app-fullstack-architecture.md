@@ -166,7 +166,7 @@ replay can never move state backwards.
 
 **Reorgs.** Only `finalized` transactions are indexed. Finalized means two thirds of stake has voted
 on a descendant block; it does not roll back. The cost is ~13 s of extra latency versus `confirmed`
-— irrelevant for a vault whose NAV moves once per 24 h epoch. Anything that must feel instant (the
+— irrelevant for a vault whose NAV moves once per 4 h epoch. Anything that must feel instant (the
 user's own transaction landing) is handled client-side, by invalidating TanStack Query on
 confirmation, exactly as V1 does today.
 
