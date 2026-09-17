@@ -15,7 +15,7 @@ const normal = { normal: {} };
 const config = { status: normal } as any;
 
 const vaultAccount = (over: Record<string, unknown> = {}) =>
-  ({ navEpoch: new BN(5), navPerShare: new BN(1_000_000_000), status: normal, pendingDeposits: new BN(1), pendingWithdrawalShares: new BN(1), depositMint: USDC, ...over }) as any;
+  ({ navEpoch: new BN(5), navPerShare: new BN(1_000_000_000), status: normal, depositPaused: 0, withdrawalPaused: 0, pendingDeposits: new BN(1), pendingWithdrawalShares: new BN(1), depositMint: USDC, ...over }) as any;
 const request = (epoch: number, createdTs: number) => ({
   key: PublicKey.unique(),
   account: { authority: PublicKey.unique(), vault: vaultKey, epoch: new BN(epoch), createdTs: new BN(createdTs) } as any,
@@ -41,8 +41,13 @@ describe("selectReady", () => {
     ["the protocol is reduce-only", vaultAccount(), { status: { reduceOnly: {} } }],
     ["the vault is reduce-only", vaultAccount({ status: { reduceOnly: {} } }), config],
     ["the vault NAV is zero", vaultAccount({ navPerShare: new BN(0) }), config],
+    ["the manager paused deposits", vaultAccount({ depositPaused: 1 }), config],
   ])("drops deposits when %s", (_, vault, cfg) => {
     expect(selectReady(vault, cfg as any, requests).map((r) => r.kind)).toEqual(["withdrawal"]);
+  });
+
+  it("drops withdrawals when the manager paused withdrawals", () => {
+    expect(selectReady(vaultAccount({ withdrawalPaused: 1 }), config, requests).map((r) => r.kind)).toEqual(["deposit", "deposit"]);
   });
 });
 

@@ -41,8 +41,9 @@ export function selectReady(vault: VaultAccount, config: ConfigAccount, requests
       .map((r): PendingRequest => ({ kind, key: r.key, owner: r.account.authority, epoch: r.account.epoch.toNumber(), createdTs: r.account.createdTs.toNumber() }))
       .filter((r) => r.epoch < navEpoch)
       .sort((a, b) => a.createdTs - b.createdTs || a.key.toBase58().localeCompare(b.key.toBase58()));
-  const depositsOpen = isNormal(config.status) && isNormal(vault.status) && !vault.navPerShare.isZero();
-  return [...(depositsOpen ? ready("deposit", requests.deposits) : []), ...ready("withdrawal", requests.withdrawals)];
+  const depositsOpen = isNormal(config.status) && isNormal(vault.status) && vault.depositPaused === 0 && !vault.navPerShare.isZero();
+  const withdrawalsOpen = vault.withdrawalPaused === 0;
+  return [...(depositsOpen ? ready("deposit", requests.deposits) : []), ...(withdrawalsOpen ? ready("withdrawal", requests.withdrawals) : [])];
 }
 
 /** Consecutive chunks of at most `size`, each of a single kind. */
