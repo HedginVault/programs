@@ -21,8 +21,8 @@ export interface Requests {
   withdrawals: { key: PublicKey; account: WithdrawalRequestAccount }[];
 }
 
-/** Resolves per transaction. Six of one kind fit the 1232-byte packet; mixing kinds does not. */
-export const RESOLVES_PER_TX = 6;
+/** Resolves per transaction. Five of one kind fit the 1232-byte packet; six overrun it at 1254. */
+export const RESOLVES_PER_TX = 5;
 const CHUNK_COMPUTE_UNITS = 1_000_000;
 const SINGLE_COMPUTE_UNITS = 200_000;
 

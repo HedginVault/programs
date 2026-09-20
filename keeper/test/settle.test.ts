@@ -52,12 +52,12 @@ describe("selectReady", () => {
 });
 
 describe("chunkRequests", () => {
-  it("caps chunks at 6 and never mixes kinds", () => {
+  it("caps chunks at 5 and never mixes kinds", () => {
     const mk = (kind: PendingRequest["kind"]): PendingRequest => ({ kind, key: PublicKey.unique(), owner: PublicKey.unique(), epoch: 1, createdTs: 1 });
     const chunks = chunkRequests([...Array.from({ length: 7 }, () => mk("deposit")), mk("withdrawal"), mk("withdrawal")]);
     expect(chunks.map((c) => [c[0].kind, c.length])).toEqual([
-      ["deposit", 6],
-      ["deposit", 1],
+      ["deposit", 5],
+      ["deposit", 2],
       ["withdrawal", 2],
     ]);
   });
@@ -103,11 +103,11 @@ describe("settleVault", () => {
     expect(fakes.fetchRequests).not.toHaveBeenCalled();
   });
 
-  it("settles ready deposits six per transaction", async () => {
+  it("settles ready deposits five per transaction", async () => {
     const deposits = Array.from({ length: 7 }, (_, i) => request(4, i));
     const { deps, alerter } = setup({ deposits: [...deposits, request(5, 99)], withdrawals: [] });
     const result = await settleVault(deps, vaultKey, vaultAccount(), config);
-    expect(builtSizes()).toEqual([6, 1]);
+    expect(builtSizes()).toEqual([5, 2]);
     expect(sendTx).toHaveBeenCalledTimes(2);
     expect(result.settled).toHaveLength(7);
     expect(result.failed).toEqual([]);
