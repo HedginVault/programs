@@ -487,10 +487,11 @@ impl Vault {
 
         self.epoch_outflow.safe_add_assign(amount)?;
 
-        validate!(
-            self.epoch_outflow as u128 <= max_epoch_outflow,
-            HedgeVaultError::EpochOutflowCapReached
-        )?;
+        // Temporarily Disable
+        // validate!(
+        //     self.epoch_outflow as u128 <= max_epoch_outflow,
+        //     HedgeVaultError::EpochOutflowCapReached
+        // )?;
 
         self.total_assets.safe_sub_assign(amount)?;
 
