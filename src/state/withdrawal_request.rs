@@ -25,8 +25,11 @@ pub struct WithdrawalRequest {
     /// Timestamp the request was created.
     pub created_ts: i64,
     pub bump: u8,
+    /// Lamports held above this account's own rent, earmarked for the payout token account created
+    /// at settlement. Refunded with the rent when the request closes.
+    pub rent_escrow: u64,
     /// Reserved for future fields.
-    pub reserved: [u8; 32],
+    pub reserved: [u8; 24],
 }
 
 impl WithdrawalRequest {
@@ -38,7 +41,8 @@ impl WithdrawalRequest {
             epoch: args.epoch,
             created_ts: args.created_ts,
             bump: args.bump,
-            reserved: [0; 32],
+            rent_escrow: 0,
+            reserved: [0; 24],
         }
     }
 

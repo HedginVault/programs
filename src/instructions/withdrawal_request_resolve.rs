@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
+    associated_token::{AssociatedToken, Create},
     token::Token,
     token_2022::{burn, transfer_checked, Burn, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
 use crate::{
-    config_seeds,
+    config_seeds, create_payout_account,
     error::HedgeVaultError,
     events::WithdrawalResolved,
     seeds::{CONFIG, SHARE_ESCROW, VAULT, WITHDRAWAL_REQUEST},
@@ -16,6 +17,7 @@ use crate::{
 /// Permissionless, anyone can resolve a request once NAV is updated.
 #[derive(Accounts)]
 pub struct WithdrawalRequestResolve<'info> {
+    #[account(mut)]
     pub resolver: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
     #[account(mut)]
@@ -31,13 +33,15 @@ pub struct WithdrawalRequestResolve<'info> {
     pub deposit_mint: InterfaceAccount<'info, Mint>,
     #[account(mut)]
     pub share_mint: InterfaceAccount<'info, Mint>,
+    /// CHECK: The withdrawer's payout account, created in [handler] when they closed it. Seeds
+    /// spell out the associated token address so the constraint checks it and clients still derive it.
     #[account(
         mut,
-        associated_token::mint = deposit_mint,
-        associated_token::authority = withdrawer,
-        associated_token::token_program = deposit_mint_token_program,
+        seeds = [withdrawer.key().as_ref(), deposit_mint_token_program.key().as_ref(), deposit_mint.key().as_ref()],
+        bump,
+        seeds::program = associated_token_program,
     )]
-    pub withdrawer_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub withdrawer_token_account: UncheckedAccount<'info>,
     #[account(
         mut,
         associated_token::mint = deposit_mint,
@@ -53,12 +57,14 @@ pub struct WithdrawalRequestResolve<'info> {
     pub share_escrow: InterfaceAccount<'info, TokenAccount>,
     pub deposit_mint_token_program: Interface<'info, TokenInterface>,
     pub share_token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
 impl<'info> WithdrawalRequestResolve<'info> {
     pub fn handler(ctx: Context<WithdrawalRequestResolve>) -> Result<()> {
         let WithdrawalRequestResolve {
+            resolver,
             config,
             vault,
             withdrawer,
@@ -70,6 +76,8 @@ impl<'info> WithdrawalRequestResolve<'info> {
             share_escrow,
             deposit_mint_token_program,
             share_token_program,
+            associated_token_program,
+            system_program,
             ..
         } = ctx.accounts;
 
@@ -107,6 +115,7 @@ impl<'info> WithdrawalRequestResolve<'info> {
         withdrawal_request.is_resolvable(vault.nav_epoch)?;
 
         let shares = withdrawal_request.shares;
+        let rent_escrow = withdrawal_request.rent_escrow;
         let amount = vault.resolve_withdrawal(shares, config.max_epoch_outflow_bps)?;
 
         // manager is expected to keep enough idle deposit mint in the vault to cover pending withdrawals
@@ -134,6 +143,22 @@ impl<'info> WithdrawalRequestResolve<'info> {
         )?;
 
         if amount > 0 {
+            create_payout_account(
+                CpiContext::new(
+                    associated_token_program.to_account_info(),
+                    Create {
+                        payer: resolver.to_account_info(),
+                        associated_token: withdrawer_token_account.to_account_info(),
+                        authority: withdrawer.to_account_info(),
+                        mint: deposit_mint.to_account_info(),
+                        system_program: system_program.to_account_info(),
+                        token_program: deposit_mint_token_program.to_account_info(),
+                    },
+                ),
+                &withdrawal_request.to_account_info(),
+                rent_escrow,
+            )?;
+
             transfer_checked(
                 CpiContext::new(
                     deposit_mint_token_program.to_account_info(),

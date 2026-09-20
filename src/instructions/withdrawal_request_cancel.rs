@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
+    associated_token::AssociatedToken,
     token::Token,
     token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount},
@@ -23,8 +24,11 @@ pub struct WithdrawalRequestCancel<'info> {
     )]
     pub withdrawal_request: Account<'info, WithdrawalRequest>,
     pub share_mint: InterfaceAccount<'info, Mint>,
+    /// Recreated when the withdrawer closed it while the request held every share; they sign here,
+    /// so they pay for it themselves.
     #[account(
-        mut,
+        init_if_needed,
+        payer = withdrawer,
         associated_token::mint = share_mint,
         associated_token::authority = withdrawer,
         associated_token::token_program = share_token_program,
@@ -37,6 +41,7 @@ pub struct WithdrawalRequestCancel<'info> {
     )]
     pub share_escrow: InterfaceAccount<'info, TokenAccount>,
     pub share_token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 

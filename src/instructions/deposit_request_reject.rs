@@ -1,11 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
+    associated_token::{AssociatedToken, Create},
     token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
 use crate::{
-    config_seeds, deposit_request_seeds,
+    config_seeds, create_payout_account, deposit_request_seeds,
     events::DepositRejected,
     seeds::{CONFIG, DEPOSIT_ESCROW, DEPOSIT_REQUEST, VAULT},
     vault_seeds, Config, DepositRequest, Vault,
@@ -15,6 +16,7 @@ use crate::{
 /// and not gated by protocol status, so it also works while paused.
 #[derive(Accounts)]
 pub struct DepositRequestReject<'info> {
+    #[account(mut)]
     pub admin: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
     #[account(mut)]
@@ -28,13 +30,15 @@ pub struct DepositRequestReject<'info> {
     )]
     pub deposit_request: Account<'info, DepositRequest>,
     pub deposit_mint: InterfaceAccount<'info, Mint>,
+    /// CHECK: The depositor's refund account, created in [handler] when they closed it. Seeds spell
+    /// out the associated token address so the constraint checks it and clients still derive it.
     #[account(
         mut,
-        associated_token::mint = deposit_mint,
-        associated_token::authority = depositor,
-        associated_token::token_program = deposit_mint_token_program,
+        seeds = [depositor.key().as_ref(), deposit_mint_token_program.key().as_ref(), deposit_mint.key().as_ref()],
+        bump,
+        seeds::program = associated_token_program,
     )]
-    pub depositor_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub depositor_token_account: UncheckedAccount<'info>,
     #[account(
         mut,
         seeds = [DEPOSIT_ESCROW, vault.key().as_ref()],
@@ -42,6 +46,7 @@ pub struct DepositRequestReject<'info> {
     )]
     pub deposit_escrow: InterfaceAccount<'info, TokenAccount>,
     pub deposit_mint_token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
@@ -57,6 +62,8 @@ impl<'info> DepositRequestReject<'info> {
             depositor_token_account,
             deposit_escrow,
             deposit_mint_token_program,
+            associated_token_program,
+            system_program,
             ..
         } = ctx.accounts;
 
@@ -90,10 +97,27 @@ impl<'info> DepositRequestReject<'info> {
         deposit_request.validate_vault(vault_key)?;
 
         let amount = deposit_request.amount;
+        let rent_escrow = deposit_request.rent_escrow;
         vault.cancel_deposit(amount)?;
 
         // CPIs borrow every passed account, the vault signs so its data must not stay borrowed
         drop(vault);
+
+        create_payout_account(
+            CpiContext::new(
+                associated_token_program.to_account_info(),
+                Create {
+                    payer: admin.to_account_info(),
+                    associated_token: depositor_token_account.to_account_info(),
+                    authority: depositor.to_account_info(),
+                    mint: deposit_mint.to_account_info(),
+                    system_program: system_program.to_account_info(),
+                    token_program: deposit_mint_token_program.to_account_info(),
+                },
+            ),
+            &deposit_request.to_account_info(),
+            rent_escrow,
+        )?;
 
         transfer_checked(
             CpiContext::new(

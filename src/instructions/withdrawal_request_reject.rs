@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
+    associated_token::{AssociatedToken, Create},
     token::Token,
     token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount},
 };
 
 use crate::{
-    config_seeds,
+    config_seeds, create_payout_account,
     events::WithdrawalRejected,
     seeds::{CONFIG, SHARE_ESCROW, VAULT, WITHDRAWAL_REQUEST},
     vault_seeds, withdrawal_request_seeds, Config, Vault, WithdrawalRequest,
@@ -16,6 +17,7 @@ use crate::{
 /// request is resolved and not gated by protocol status, so it also works while paused.
 #[derive(Accounts)]
 pub struct WithdrawalRequestReject<'info> {
+    #[account(mut)]
     pub admin: Signer<'info>,
     pub config: AccountLoader<'info, Config>,
     #[account(mut)]
@@ -29,13 +31,15 @@ pub struct WithdrawalRequestReject<'info> {
     )]
     pub withdrawal_request: Account<'info, WithdrawalRequest>,
     pub share_mint: InterfaceAccount<'info, Mint>,
+    /// CHECK: The withdrawer's share account, created in [handler] when they closed it. Seeds spell
+    /// out the associated token address so the constraint checks it and clients still derive it.
     #[account(
         mut,
-        associated_token::mint = share_mint,
-        associated_token::authority = withdrawer,
-        associated_token::token_program = share_token_program,
+        seeds = [withdrawer.key().as_ref(), share_token_program.key().as_ref(), share_mint.key().as_ref()],
+        bump,
+        seeds::program = associated_token_program,
     )]
-    pub withdrawer_share_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub withdrawer_share_token_account: UncheckedAccount<'info>,
     #[account(
         mut,
         seeds = [SHARE_ESCROW, vault.key().as_ref()],
@@ -43,6 +47,7 @@ pub struct WithdrawalRequestReject<'info> {
     )]
     pub share_escrow: InterfaceAccount<'info, TokenAccount>,
     pub share_token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
@@ -58,6 +63,8 @@ impl<'info> WithdrawalRequestReject<'info> {
             withdrawer_share_token_account,
             share_escrow,
             share_token_program,
+            associated_token_program,
+            system_program,
             ..
         } = ctx.accounts;
 
@@ -91,10 +98,27 @@ impl<'info> WithdrawalRequestReject<'info> {
         withdrawal_request.validate_vault(vault_key)?;
 
         let shares = withdrawal_request.shares;
+        let rent_escrow = withdrawal_request.rent_escrow;
         vault.cancel_withdrawal(shares)?;
 
         // CPIs borrow every passed account, the vault signs so its data must not stay borrowed
         drop(vault);
+
+        create_payout_account(
+            CpiContext::new(
+                associated_token_program.to_account_info(),
+                Create {
+                    payer: admin.to_account_info(),
+                    associated_token: withdrawer_share_token_account.to_account_info(),
+                    authority: withdrawer.to_account_info(),
+                    mint: share_mint.to_account_info(),
+                    system_program: system_program.to_account_info(),
+                    token_program: share_token_program.to_account_info(),
+                },
+            ),
+            &withdrawal_request.to_account_info(),
+            rent_escrow,
+        )?;
 
         transfer_checked(
             CpiContext::new(

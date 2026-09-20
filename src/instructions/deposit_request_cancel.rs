@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
+    associated_token::AssociatedToken,
     token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
@@ -23,8 +24,11 @@ pub struct DepositRequestCancel<'info> {
     )]
     pub deposit_request: Account<'info, DepositRequest>,
     pub deposit_mint: InterfaceAccount<'info, Mint>,
+    /// Recreated when the depositor closed it while the request was pending; they sign here, so
+    /// they pay for it themselves.
     #[account(
-        mut,
+        init_if_needed,
+        payer = depositor,
         associated_token::mint = deposit_mint,
         associated_token::authority = depositor,
         associated_token::token_program = deposit_mint_token_program,
@@ -37,6 +41,7 @@ pub struct DepositRequestCancel<'info> {
     )]
     pub deposit_escrow: InterfaceAccount<'info, TokenAccount>,
     pub deposit_mint_token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
