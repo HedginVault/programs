@@ -14,7 +14,10 @@ use anchor_spl::{
     },
     token_2022::spl_token_2022::{
         self,
-        extension::{transfer_fee::instruction::initialize_transfer_fee_config, ExtensionType},
+        extension::{
+            transfer_fee::instruction::initialize_transfer_fee_config, BaseStateWithExtensions,
+            ExtensionType, StateWithExtensions,
+        },
         state::Mint,
     },
 };
@@ -270,6 +273,74 @@ impl TestContext {
         account
     }
 
+    /// Closes `account`, returning its rent to the owner: what a wallet's "reclaim rent" does, and
+    /// what left a request unresolvable before the rent escrow existed.
+    pub fn close_token_account(
+        &mut self,
+        owner: &Keypair,
+        account: &Pubkey,
+        token_program: &Pubkey,
+    ) -> TransactionResult {
+        let close = spl_token_2022::instruction::close_account(
+            token_program,
+            account,
+            &owner.pubkey(),
+            &owner.pubkey(),
+            &[],
+        )
+        .unwrap();
+        self.send(&[close], &[owner])
+    }
+
+    pub fn lamports(&self, address: &Pubkey) -> u64 {
+        self.svm.get_account(address).map_or(0, |a| a.lamports)
+    }
+
+    /// Rent-exempt minimum for a token account of `mint`. Mirrors the program's escrow sizing.
+    pub fn token_account_rent(&self, mint: &Pubkey) -> u64 {
+        let account = self.svm.get_account(mint).unwrap();
+        let len = if account.owner == TOKEN_2022_PROGRAM {
+            let state = StateWithExtensions::<Mint>::unpack(&account.data).unwrap();
+            let mut required = ExtensionType::get_required_init_account_extensions(
+                &state.get_extension_types().unwrap(),
+            );
+            required.push(ExtensionType::ImmutableOwner);
+
+            ExtensionType::try_calculate_account_len::<spl_token_2022::state::Account>(&required)
+                .unwrap()
+        } else {
+            165
+        };
+
+        self.svm.minimum_balance_for_rent_exemption(len)
+    }
+
+    /// What a request escrows: rent for whichever payout account it may need.
+    pub fn payout_escrow(&self, v: &TestVault) -> u64 {
+        self.token_account_rent(&v.share_mint)
+            .max(self.token_account_rent(&v.deposit_mint))
+    }
+
+    /// Creates `owner`'s ATA for `mint` without minting into it, paid by the admin.
+    pub fn create_token_account(
+        &mut self,
+        owner: &Pubkey,
+        mint: &Pubkey,
+        token_program: &Pubkey,
+    ) -> Pubkey {
+        let admin = self.admin.pubkey();
+        let create = create_associated_token_account(&admin, owner, mint, token_program);
+        self.send(&[create], &[]).unwrap();
+
+        ata(owner, mint, token_program)
+    }
+
+    pub fn account_exists(&self, address: &Pubkey) -> bool {
+        self.svm
+            .get_account(address)
+            .is_some_and(|a| !a.data.is_empty())
+    }
+
     pub fn token_balance(&self, address: &Pubkey) -> u64 {
         match self.svm.get_account(address) {
             Some(account) if account.data.len() >= 72 => {
@@ -364,6 +435,8 @@ impl TestContext {
             min_deposit: None,
             min_withdrawal_shares: None,
             status: None,
+            deposit_paused: None,
+            withdrawal_paused: None,
         }
     }
 
@@ -454,12 +527,9 @@ impl TestContext {
                 deposit_mint: v.deposit_mint,
                 share_mint: v.share_mint,
                 depositor_token_account: ata(&depositor, &v.deposit_mint, &v.deposit_token_program),
-                depositor_share_token_account: ata(&depositor, &v.share_mint, &TOKEN_PROGRAM),
                 deposit_escrow: deposit_escrow_pda(&v.address),
                 system_program: system_program::ID,
                 deposit_mint_token_program: v.deposit_token_program,
-                share_token_program: TOKEN_PROGRAM,
-                associated_token_program: anchor_spl::associated_token::ID,
             },
             instruction::DepositRequestCreate { amount },
         );
@@ -477,6 +547,7 @@ impl TestContext {
                 depositor_token_account: ata(&depositor, &v.deposit_mint, &v.deposit_token_program),
                 deposit_escrow: deposit_escrow_pda(&v.address),
                 deposit_mint_token_program: v.deposit_token_program,
+                associated_token_program: anchor_spl::associated_token::ID,
                 system_program: system_program::ID,
             },
             instruction::DepositRequestCancel {},
@@ -485,9 +556,20 @@ impl TestContext {
     }
 
     pub fn deposit_request_resolve(&mut self, v: &TestVault, depositor: &Pubkey) -> TransactionResult {
+        self.deposit_request_resolve_by(v, depositor, None)
+    }
+
+    /// `resolver` defaults to the admin. A separate resolver never pays the transaction fee here,
+    /// so its balance shows exactly what settlement cost it.
+    pub fn deposit_request_resolve_by(
+        &mut self,
+        v: &TestVault,
+        depositor: &Pubkey,
+        resolver: Option<&Keypair>,
+    ) -> TransactionResult {
         let resolve = ix(
             accounts::DepositRequestResolve {
-                resolver: self.admin.pubkey(),
+                resolver: resolver.map_or(self.admin.pubkey(), |r| r.pubkey()),
                 config: config_pda(),
                 vault: v.address,
                 depositor: *depositor,
@@ -499,11 +581,13 @@ impl TestContext {
                 deposit_escrow: deposit_escrow_pda(&v.address),
                 deposit_mint_token_program: v.deposit_token_program,
                 share_token_program: TOKEN_PROGRAM,
+                associated_token_program: anchor_spl::associated_token::ID,
                 system_program: system_program::ID,
             },
             instruction::DepositRequestResolve {},
         );
-        self.send(&[resolve], &[])
+        let signers: Vec<&Keypair> = resolver.into_iter().collect();
+        self.send(&[resolve], &signers)
     }
 
     pub fn withdrawal_request_create(&mut self, v: &TestVault, user: &Keypair, shares: u64) -> TransactionResult {
@@ -517,12 +601,10 @@ impl TestContext {
                 deposit_mint: v.deposit_mint,
                 share_mint: v.share_mint,
                 withdrawer_share_token_account: ata(&withdrawer, &v.share_mint, &TOKEN_PROGRAM),
-                withdrawer_token_account: ata(&withdrawer, &v.deposit_mint, &v.deposit_token_program),
                 share_escrow: share_escrow_pda(&v.address),
                 system_program: system_program::ID,
                 deposit_mint_token_program: v.deposit_token_program,
                 share_token_program: TOKEN_PROGRAM,
-                associated_token_program: anchor_spl::associated_token::ID,
             },
             instruction::WithdrawalRequestCreate { shares },
         );
@@ -530,9 +612,19 @@ impl TestContext {
     }
 
     pub fn withdrawal_request_resolve(&mut self, v: &TestVault, withdrawer: &Pubkey) -> TransactionResult {
+        self.withdrawal_request_resolve_by(v, withdrawer, None)
+    }
+
+    /// `resolver` defaults to the admin. See [`TestContext::deposit_request_resolve_by`].
+    pub fn withdrawal_request_resolve_by(
+        &mut self,
+        v: &TestVault,
+        withdrawer: &Pubkey,
+        resolver: Option<&Keypair>,
+    ) -> TransactionResult {
         let resolve = ix(
             accounts::WithdrawalRequestResolve {
-                resolver: self.admin.pubkey(),
+                resolver: resolver.map_or(self.admin.pubkey(), |r| r.pubkey()),
                 config: config_pda(),
                 vault: v.address,
                 withdrawer: *withdrawer,
@@ -544,11 +636,13 @@ impl TestContext {
                 share_escrow: share_escrow_pda(&v.address),
                 deposit_mint_token_program: v.deposit_token_program,
                 share_token_program: TOKEN_PROGRAM,
+                associated_token_program: anchor_spl::associated_token::ID,
                 system_program: system_program::ID,
             },
             instruction::WithdrawalRequestResolve {},
         );
-        self.send(&[resolve], &[])
+        let signers: Vec<&Keypair> = resolver.into_iter().collect();
+        self.send(&[resolve], &signers)
     }
 
     pub fn withdrawal_request_cancel(&mut self, v: &TestVault, user: &Keypair) -> TransactionResult {
@@ -562,6 +656,7 @@ impl TestContext {
                 withdrawer_share_token_account: ata(&withdrawer, &v.share_mint, &TOKEN_PROGRAM),
                 share_escrow: share_escrow_pda(&v.address),
                 share_token_program: TOKEN_PROGRAM,
+                associated_token_program: anchor_spl::associated_token::ID,
                 system_program: system_program::ID,
             },
             instruction::WithdrawalRequestCancel {},
@@ -628,6 +723,7 @@ impl TestContext {
                 depositor_token_account: ata(depositor, &v.deposit_mint, &v.deposit_token_program),
                 deposit_escrow: deposit_escrow_pda(&v.address),
                 deposit_mint_token_program: v.deposit_token_program,
+                associated_token_program: anchor_spl::associated_token::ID,
                 system_program: system_program::ID,
             },
             instruction::DepositRequestReject {},
@@ -654,6 +750,7 @@ impl TestContext {
                 withdrawer_share_token_account: ata(withdrawer, &v.share_mint, &TOKEN_PROGRAM),
                 share_escrow: share_escrow_pda(&v.address),
                 share_token_program: TOKEN_PROGRAM,
+                associated_token_program: anchor_spl::associated_token::ID,
                 system_program: system_program::ID,
             },
             instruction::WithdrawalRequestReject {},

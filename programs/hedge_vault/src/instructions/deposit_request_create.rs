@@ -1,7 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
-    associated_token::AssociatedToken,
-    token::Token,
     token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
@@ -9,6 +7,7 @@ use anchor_spl::{
 use crate::{
     config_seeds, deposit_request_seeds,
     error::HedgeVaultError,
+    escrow_payout_rent,
     events::DepositRequested,
     seeds::{CONFIG, DEPOSIT_ESCROW, DEPOSIT_REQUEST, VAULT},
     validate, validate_deposit_mint_extensions, vault_seeds, Config, DepositRequest,
@@ -39,15 +38,6 @@ pub struct DepositRequestCreate<'info> {
         associated_token::token_program = deposit_mint_token_program,
     )]
     pub depositor_token_account: InterfaceAccount<'info, TokenAccount>,
-    /// Created upfront so the request can be resolved permissionlessly.
-    #[account(
-        init_if_needed,
-        payer = depositor,
-        associated_token::mint = share_mint,
-        associated_token::authority = depositor,
-        associated_token::token_program = share_token_program,
-    )]
-    pub depositor_share_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
         seeds = [DEPOSIT_ESCROW, vault.key().as_ref()],
@@ -56,8 +46,6 @@ pub struct DepositRequestCreate<'info> {
     pub deposit_escrow: InterfaceAccount<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
     pub deposit_mint_token_program: Interface<'info, TokenInterface>,
-    pub share_token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 impl<'info> DepositRequestCreate<'info> {
@@ -72,6 +60,7 @@ impl<'info> DepositRequestCreate<'info> {
             depositor_token_account,
             deposit_escrow,
             deposit_mint_token_program,
+            system_program,
             ..
         } = ctx.accounts;
 
@@ -113,6 +102,15 @@ impl<'info> DepositRequestCreate<'info> {
                 created_ts: now,
                 bump: ctx.bumps.deposit_request,
             }));
+
+            // the share account is created at settlement instead, where the depositor does not sign
+            deposit_request.rent_escrow = escrow_payout_rent(
+                &depositor.to_account_info(),
+                &deposit_request.to_account_info(),
+                &share_mint.to_account_info(),
+                &deposit_mint.to_account_info(),
+                &system_program.to_account_info(),
+            )?;
         } else {
             let deposit_request_key = deposit_request.key();
             let deposit_request_bump = deposit_request.bump;

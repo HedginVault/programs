@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
-    associated_token::AssociatedToken,
     token::Token,
     token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
@@ -9,6 +8,7 @@ use anchor_spl::{
 use crate::{
     config_seeds,
     error::HedgeVaultError,
+    escrow_payout_rent,
     events::WithdrawalRequested,
     seeds::{CONFIG, SHARE_ESCROW, VAULT, WITHDRAWAL_REQUEST},
     validate, vault_seeds, withdrawal_request_seeds, Config, NewWithdrawalRequestArgs, Vault,
@@ -39,15 +39,6 @@ pub struct WithdrawalRequestCreate<'info> {
         associated_token::token_program = share_token_program,
     )]
     pub withdrawer_share_token_account: InterfaceAccount<'info, TokenAccount>,
-    /// Created upfront so the request can be resolved permissionlessly.
-    #[account(
-        init_if_needed,
-        payer = withdrawer,
-        associated_token::mint = deposit_mint,
-        associated_token::authority = withdrawer,
-        associated_token::token_program = deposit_mint_token_program,
-    )]
-    pub withdrawer_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
         seeds = [SHARE_ESCROW, vault.key().as_ref()],
@@ -57,7 +48,6 @@ pub struct WithdrawalRequestCreate<'info> {
     pub system_program: Program<'info, System>,
     pub deposit_mint_token_program: Interface<'info, TokenInterface>,
     pub share_token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 impl<'info> WithdrawalRequestCreate<'info> {
@@ -72,6 +62,7 @@ impl<'info> WithdrawalRequestCreate<'info> {
             withdrawer_share_token_account,
             share_escrow,
             share_token_program,
+            system_program,
             ..
         } = ctx.accounts;
 
@@ -110,16 +101,22 @@ impl<'info> WithdrawalRequestCreate<'info> {
                 created_ts: now,
                 bump: ctx.bumps.withdrawal_request,
             }));
+
+            // the payout account is created at settlement instead, where the withdrawer does not sign
+            withdrawal_request.rent_escrow = escrow_payout_rent(
+                &withdrawer.to_account_info(),
+                &withdrawal_request.to_account_info(),
+                &share_mint.to_account_info(),
+                &deposit_mint.to_account_info(),
+                &system_program.to_account_info(),
+            )?;
         } else {
             let withdrawal_request_key = withdrawal_request.key();
             let withdrawal_request_bump = withdrawal_request.bump;
             let withdrawal_request_seeds =
                 withdrawal_request_seeds!(vault_key, withdrawer_key, withdrawal_request_bump);
 
-            WithdrawalRequest::validate_address(
-                withdrawal_request_seeds,
-                withdrawal_request_key,
-            )?;
+            WithdrawalRequest::validate_address(withdrawal_request_seeds, withdrawal_request_key)?;
         }
 
         withdrawal_request.add(shares, epoch)?;

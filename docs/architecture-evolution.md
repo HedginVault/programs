@@ -357,8 +357,9 @@ title Strategy v1 - 97 bytes
 - New protocols are new enum variants. `StrategyType::space()` sizes each account at
   creation, so a bigger payload only affects new strategies.
 
-**Requests (89 bytes, 0 free, live one or two epochs).** Use the drain rule for the next
-layout change and add `padding: [u8; 16]` at that point so later changes need no drain.
+**Requests (121 bytes, 24 reserved, live one or two epochs).** `rent_escrow` took the first 8
+reserved bytes, which cost no drain: the bytes were already zero on chain and zero is exactly
+"no escrow". Spend the remaining 24 the same way, and use the drain rule only once they run out.
 Candidate fields: `sequence` for FIFO, `min_shares_out` / `min_amount_out` for user-side NAV
 slippage, `filled` for pro-rata settlement.
 

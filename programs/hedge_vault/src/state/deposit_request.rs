@@ -25,8 +25,11 @@ pub struct DepositRequest {
     /// Timestamp the request was created.
     pub created_ts: i64,
     pub bump: u8,
+    /// Lamports held above this account's own rent, earmarked for the payout token account created
+    /// at settlement. Refunded with the rent when the request closes.
+    pub rent_escrow: u64,
     /// Reserved for future fields.
-    pub reserved: [u8; 32],
+    pub reserved: [u8; 24],
 }
 
 impl DepositRequest {
@@ -38,7 +41,8 @@ impl DepositRequest {
             epoch: args.epoch,
             created_ts: args.created_ts,
             bump: args.bump,
-            reserved: [0; 32],
+            rent_escrow: 0,
+            reserved: [0; 24],
         }
     }
 
@@ -105,6 +109,13 @@ mod tests {
             created_ts: 0,
             bump: 0,
         })
+    }
+
+    #[test]
+    fn layout_size_is_stable() {
+        // rent_escrow came out of reserved, so accounts written before it decode with escrow 0
+        assert_eq!(DepositRequest::INIT_SPACE, 121);
+        assert_eq!(request(0).rent_escrow, 0);
     }
 
     #[test]

@@ -270,8 +270,8 @@ No amounts are stored. Utilization is read from the protocol accounts and token 
 | | |
 | --- | --- |
 | Seeds | `["deposit_request", vault, depositor]` (one per user per vault) |
-| Layout | borsh, 89 bytes |
-| Created by | `deposit_request_create` (depositor pays rent) |
+| Layout | borsh, 121 bytes (24 reserved) |
+| Created by | `deposit_request_create` (depositor pays rent, plus the payout-account rent it escrows) |
 | Mutated by | `deposit_request_create` again in the same epoch (amount accumulates) |
 | Closed by | `deposit_request_cancel` (depositor, only while `vault.nav_epoch <= epoch` or vault NAV is 0), `deposit_request_resolve` (anyone, only when `vault.nav_epoch > epoch`) or `deposit_request_reject` (admin, any time before resolution); rent returns to `authority` |
 
@@ -282,6 +282,7 @@ No amounts are stored. Utilization is read from the protocol accounts and token 
 | `amount` | `u64` | Deposit mint held in deposit escrow. |
 | `epoch` | `u64` | Epoch of the first request. A request from an older epoch must be resolved before a new one is accepted. |
 | `bump` | `u8` | PDA bump. |
+| `rent_escrow` | `u64` | Lamports held above this account's own rent, for creating the depositor's share account at settlement. Refunded with the rent when the request closes unused. 0 on requests created before the escrow existed. |
 
 On resolve: `shares = amount * 1e9 / vault.nav_per_share`. Fails while NAV is 0 or if the result is 0 shares; while NAV is 0 the depositor may cancel.
 
@@ -290,8 +291,8 @@ On resolve: `shares = amount * 1e9 / vault.nav_per_share`. Fails while NAV is 0 
 | | |
 | --- | --- |
 | Seeds | `["withdrawal_request", vault, withdrawer]` (one per user per vault) |
-| Layout | borsh, 89 bytes |
-| Created by | `withdrawal_request_create` (withdrawer pays rent) |
+| Layout | borsh, 121 bytes (24 reserved) |
+| Created by | `withdrawal_request_create` (withdrawer pays rent, plus the payout-account rent it escrows) |
 | Mutated by | `withdrawal_request_create` again in the same epoch (shares accumulate) |
 | Closed by | `withdrawal_request_cancel` (withdrawer, only while `vault.nav_epoch <= epoch`), `withdrawal_request_resolve` (anyone, only when `vault.nav_epoch > epoch`) or `withdrawal_request_reject` (admin, any time before resolution); rent returns to `authority` |
 
@@ -302,8 +303,19 @@ On resolve: `shares = amount * 1e9 / vault.nav_per_share`. Fails while NAV is 0 
 | `shares` | `u64` | Shares held in share escrow. |
 | `epoch` | `u64` | Epoch of the first request. |
 | `bump` | `u8` | PDA bump. |
+| `rent_escrow` | `u64` | Lamports held above this account's own rent, for creating the withdrawer's payout account at settlement, or their share account if the request is rejected instead. Refunded with the rent when the request closes unused. |
 
 On resolve: `amount = shares * vault.nav_per_share / 1e9`, paid from the vault token account, which must hold at least that balance, and subject to the per-epoch outflow cap.
+
+### Why a request carries rent
+
+Settlement is permissionless and admin rejection is not signed by the owner, so neither can be asked
+to fund a token account for somebody else. Creating the payout account with the request does not work
+either: it sits empty until settlement, so its owner can close it to reclaim the rent and leave the
+request unsettleable by anyone. Each request therefore escrows the rent for the one payout account it
+may need, sized as the larger of a share account and a deposit mint account, and settlement creates
+that account when it is missing: the settling party funds it and the escrow repays them in the same
+instruction, so settlement costs them nothing.
 
 ## Request lifecycle
 
