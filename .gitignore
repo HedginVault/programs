@@ -10,6 +10,4 @@ test-ledger
 docs/drafts/
 docs/superpowers/
 
-# keeper
-keeper/.env
-keeper/dist
+.gstack/

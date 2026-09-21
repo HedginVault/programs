@@ -752,16 +752,15 @@ mod tests {
     }
 
     #[test]
-    fn resolve_withdrawal_enforces_epoch_outflow_cap() {
+    fn resolve_withdrawal_allows_outflow_above_epoch_cap_when_disabled() {
         let mut v = new_vault(0, 0);
         v.total_assets = 100 * USDC;
         v.pending_withdrawal_shares = 55 * USDC;
 
         assert_eq!(v.resolve_withdrawal(30 * USDC, 5_000).unwrap(), 30 * USDC);
-        assert_err(
-            v.resolve_withdrawal(25 * USDC, 5_000),
-            HedgeVaultError::EpochOutflowCapReached,
-        );
+        assert_eq!(v.resolve_withdrawal(25 * USDC, 5_000).unwrap(), 25 * USDC);
+        assert_eq!(v.epoch_outflow, 55 * USDC);
+        assert_eq!(v.total_assets, 45 * USDC);
     }
 
     #[test]
