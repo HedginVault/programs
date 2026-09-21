@@ -185,4 +185,11 @@ pub mod hedge_vault {
     ) -> Result<()> {
         MeteoraDlmmClaimFee::handler(ctx, remaining_accounts_info)
     }
+
+    pub fn meteora_dlmm_close_position<'info>(
+        ctx: Context<'_, '_, '_, 'info, MeteoraDlmmClosePosition<'info>>,
+        remaining_accounts_info: dlmm::types::RemainingAccountsInfo,
+    ) -> Result<()> {
+        MeteoraDlmmClosePosition::handler(ctx, remaining_accounts_info)
+    }
 }

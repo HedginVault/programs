@@ -46,6 +46,9 @@ pub use meteora_dlmm_add_liquidity::*;
 pub mod meteora_dlmm_claim_fee;
 pub use meteora_dlmm_claim_fee::*;
 
+pub mod meteora_dlmm_close_position;
+pub use meteora_dlmm_close_position::*;
+
 pub mod meteora_dlmm_initialize_position;
 pub use meteora_dlmm_initialize_position::*;
 
