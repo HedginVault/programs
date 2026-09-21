@@ -4,7 +4,7 @@ use anchor_spl::token_interface::Mint;
 use crate::{
     config_seeds,
     error::HedgeVaultError,
-    events::StrategyInitialized,
+    events::{StrategyInitialized, StrategyInitializedV2},
     seeds::{CONFIG, STRATEGY, VAULT},
     validate, vault_seeds, Config, NewStrategyArgs, Strategy, StrategyType, Vault,
 };
@@ -86,6 +86,13 @@ impl<'info> JupiterInitializeStrategy<'info> {
             strategy: strategy.key(),
             id: strategy.id,
             strategy_type: strategy.strategy_type,
+        });
+        emit!(StrategyInitializedV2 {
+            vault: vault_key,
+            strategy: strategy.key(),
+            id: strategy.id,
+            strategy_type: strategy.strategy_type,
+            created_ts: now,
         });
 
         Ok(())

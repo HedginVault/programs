@@ -12,9 +12,9 @@ use crate::{
         types::{LiquidityParameterByStrategy, RemainingAccountsInfo},
     },
     error::HedgeVaultError,
-    events::MeteoraDlmmLiquidityAdded,
+    events::{MeteoraDlmmLiquidityAdded, MeteoraDlmmLiquidityAddedV2},
     seeds::{CONFIG, STRATEGY, VAULT},
-    strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
+    strategy_seeds, validate, vault_seeds, Config, SafeMath, Strategy, StrategyType, Vault,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -149,6 +149,8 @@ impl<'info> MeteoraDlmmAddLiquidity<'info> {
         drop(vault);
 
         let (amount_x, amount_y) = (liquidity_parameter.amount_x, liquidity_parameter.amount_y);
+        let balance_x_before = vault_token_x.amount;
+        let balance_y_before = vault_token_y.amount;
 
         add_liquidity_by_strategy2(
             CpiContext::new(
@@ -178,12 +180,27 @@ impl<'info> MeteoraDlmmAddLiquidity<'info> {
             remaining_accounts_info,
         )?;
 
+        vault_token_x.reload()?;
+        vault_token_y.reload()?;
+        let amount_x_spent = balance_x_before.safe_sub(vault_token_x.amount)?;
+        let amount_y_spent = balance_y_before.safe_sub(vault_token_y.amount)?;
+
         emit!(MeteoraDlmmLiquidityAdded {
             vault: vault_key,
             strategy: strategy_key,
             position: position_key,
             amount_x,
             amount_y,
+        });
+        emit!(MeteoraDlmmLiquidityAddedV2 {
+            vault: vault_key,
+            strategy: strategy_key,
+            strategy_id: strategy.id,
+            position: position_key,
+            token_x_mint: token_x_mint.key(),
+            token_y_mint: token_y_mint.key(),
+            amount_x_spent,
+            amount_y_spent,
         });
 
         Ok(())

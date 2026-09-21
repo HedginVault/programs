@@ -8,7 +8,7 @@ use anchor_spl::{
 use crate::{
     config_seeds, dlmm,
     error::HedgeVaultError,
-    events::StrategyClosed,
+    events::{StrategyClosed, StrategyClosedV2},
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
 };
@@ -65,7 +65,10 @@ impl<'info> VaultCloseStrategy<'info> {
             StrategyType::JupiterSwap { target_mint } => target_mint,
         };
 
-        validate!(strategy.vault == vault_key, HedgeVaultError::InvalidStrategy)?;
+        validate!(
+            strategy.vault == vault_key,
+            HedgeVaultError::InvalidStrategy
+        )?;
         Strategy::validate_address(
             strategy_seeds!(vault_key, protocol_account, strategy.bump),
             strategy.key(),
@@ -79,14 +82,21 @@ impl<'info> VaultCloseStrategy<'info> {
             vault: vault_key,
             strategy: strategy.key(),
         });
+        emit!(StrategyClosedV2 {
+            vault: vault_key,
+            strategy: strategy.key(),
+            id: strategy.id,
+            strategy_type: strategy.strategy_type,
+            created_ts: strategy.created_ts,
+            closed_ts: Clock::get()?.unix_timestamp,
+        });
 
         match strategy.strategy_type {
             StrategyType::MeteoraDlmm { position } => {
                 // [0] - position account
                 // [1] - dlmm_program
                 // [2] - dlmm_event_authority
-                let [position_account, dlmm_program, dlmm_event_authority] =
-                    ctx.remaining_accounts
+                let [position_account, dlmm_program, dlmm_event_authority] = ctx.remaining_accounts
                 else {
                     return Err(HedgeVaultError::InvalidRemainingAccounts.into());
                 };
