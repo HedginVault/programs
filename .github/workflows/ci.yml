@@ -17,7 +17,7 @@ concurrency:
 
 env:
   SOLANA_VERSION: 3.1.11
-  ANCHOR_VERSION: 0.32.1
+  ANCHOR_VERSION: 0.31.1
 
 jobs:
   # Verification only — this workflow never touches the upgrade authority or
@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.79.0
+        uses: dtolnay/rust-toolchain@1.89.0
 
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
