@@ -237,7 +237,7 @@ impl<'info> MeteoraDlmmClaimFee<'info> {
 }
 
 /// Sends [TREASURY_CLAIM_FEE_BPS] of a claimed amount from the vault to the treasury, returns the amount sent.
-pub(crate) fn transfer_treasury_fee<'info>(
+fn transfer_treasury_fee<'info>(
     claimed_amount: u64,
     vault_token_account: &InterfaceAccount<'info, TokenAccount>,
     treasury_token_account: &InterfaceAccount<'info, TokenAccount>,

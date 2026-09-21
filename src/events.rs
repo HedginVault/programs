@@ -241,18 +241,3 @@ pub struct MeteoraDlmmFeeClaimed {
     pub treasury_amount_x: u64,
     pub treasury_amount_y: u64,
 }
-
-#[event]
-pub struct MeteoraDlmmPositionClosed {
-    pub vault: Pubkey,
-    pub strategy: Pubkey,
-    pub position: Pubkey,
-    /// Liquidity principal withdrawn, no treasury share is taken from this.
-    pub liquidity_amount_x: u64,
-    pub liquidity_amount_y: u64,
-    /// Total fees claimed into the vault, including the treasury share.
-    pub fee_amount_x: u64,
-    pub fee_amount_y: u64,
-    pub treasury_amount_x: u64,
-    pub treasury_amount_y: u64,
-}
