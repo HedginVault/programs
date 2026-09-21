@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOLANA_VERSION: 3.1.11
+  ANCHOR_VERSION: 0.32.1
+
+jobs:
+  # Verification only — this workflow never touches the upgrade authority or
+  # deploys anywhere. Upgrading the on-chain program stays a deliberate manual
+  # step (anchor upgrade / solana program deploy), run from a build produced
+  # by the same `anchor build --verifiable` this job runs, so the deployed
+  # program can be independently verified against this source later.
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.79.0
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: programs
+
+      - name: Cache Solana CLI
+        id: cache-solana
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/solana
+          key: solana-${{ env.SOLANA_VERSION }}
+
+      - name: Install Solana CLI
+        if: steps.cache-solana.outputs.cache-hit != 'true'
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+
+      - name: Add Solana to PATH
+        run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Anchor CLI
+        id: cache-anchor
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/anchor
+          key: anchor-${{ env.ANCHOR_VERSION }}
+
+      - name: Install Anchor CLI
+        if: steps.cache-anchor.outputs.cache-hit != 'true'
+        run: cargo install anchor-cli --version ${{ env.ANCHOR_VERSION }} --locked
+
+      - name: Unit tests
+        run: cargo test --lib
+
+      - name: Build (native, fast compile-error signal)
+        run: cargo build --lib
+
+      # Deterministic build; anyone can later reproduce this exact hash from
+      # this commit and diff it against whatever is deployed on-chain.
+      - name: Verifiable build
+        run: anchor build --verifiable
