@@ -1,1 +1,13 @@
-target/
+.anchor
+.DS_Store
+target
+**/*.rs.bk
+node_modules
+test-ledger
+.yarn
+
+# local design drafts, not published
+docs/drafts/
+docs/superpowers/
+
+.gstack/

@@ -67,10 +67,10 @@ jobs:
         run: cargo install anchor-cli --version ${{ env.ANCHOR_VERSION }} --locked
 
       - name: Unit tests
-        run: cargo test --lib
+        run: cargo test -p hedge_vault --lib
 
       - name: Build (native, fast compile-error signal)
-        run: cargo build --lib
+        run: cargo build -p hedge_vault --lib
 
       # Deterministic build; anyone can later reproduce this exact hash from
       # this commit and diff it against whatever is deployed on-chain.

@@ -1,0 +1,16 @@
+[package]
+name = "hedge-vault-litesvm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Detached from the program workspace so test dependencies never change the program's Cargo.lock.
+[workspace]
+
+[dependencies]
+hedge_vault = { path = "../../programs/hedge_vault", features = ["no-entrypoint"] }
+anchor-lang = "0.31.1"
+anchor-spl = "0.31.1"
+bytemuck = "1"
+litesvm = "=0.7.1"
+solana-sdk = "2"
