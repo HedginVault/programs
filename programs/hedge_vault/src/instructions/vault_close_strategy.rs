@@ -9,6 +9,7 @@ use crate::{
     config_seeds, dlmm,
     error::HedgeVaultError,
     events::StrategyClosed,
+    protocol::phoenix::{PhoenixGlobalConfig, PhoenixTrader, PHOENIX_GLOBAL_CONFIGURATION},
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
 };
@@ -63,6 +64,7 @@ impl<'info> VaultCloseStrategy<'info> {
         let protocol_account = match strategy.strategy_type {
             StrategyType::MeteoraDlmm { position } => position,
             StrategyType::JupiterSwap { target_mint } => target_mint,
+            StrategyType::PhoenixPerp { trader_account } => trader_account,
         };
 
         validate!(
@@ -170,6 +172,62 @@ impl<'info> VaultCloseStrategy<'info> {
                     token_program.to_account_info(),
                     CloseAccount {
                         account: vault_target_mint_token_account.to_account_info(),
+                        destination: authority.to_account_info(),
+                        authority: vault_acc_info,
+                    },
+                    &[vault_seeds],
+                ))?;
+            }
+            StrategyType::PhoenixPerp { trader_account } => {
+                // [0] - trader_account
+                // [1] - phoenix global_config
+                // [2] - vault_canonical_token_account
+                // [3] - token_program
+                let [trader_account_info, global_config, vault_canonical_token_account, token_program] =
+                    ctx.remaining_accounts
+                else {
+                    return Err(HedgeVaultError::InvalidRemainingAccounts.into());
+                };
+
+                validate!(
+                    trader_account_info.key() == trader_account,
+                    HedgeVaultError::InvalidPhoenixTrader
+                )?;
+                validate!(
+                    global_config.key() == PHOENIX_GLOBAL_CONFIGURATION,
+                    HedgeVaultError::InvalidPhoenixAccount
+                )?;
+                validate!(
+                    token_program.key() == anchor_spl::token::ID,
+                    HedgeVaultError::InvalidTokenProgram
+                )?;
+
+                // Phoenix has no instruction to close a trader account, its rent stays with Phoenix
+                PhoenixTrader::load(trader_account_info)?.is_empty()?;
+
+                let canonical_mint = PhoenixGlobalConfig::load(global_config)?.canonical_mint;
+
+                // only the vault's own ATA for the canonical mint may be closed, never an escrow
+                validate!(
+                    vault_canonical_token_account.key()
+                        == get_associated_token_address_with_program_id(
+                            &vault_key,
+                            &canonical_mint,
+                            token_program.key,
+                        ),
+                    HedgeVaultError::InvalidPhoenixAccount
+                )?;
+
+                if vault_canonical_token_account.get_lamports() == 0 {
+                    // ATA does not exist, nothing to close
+                    return Ok(());
+                }
+
+                // fails in token program if the account still holds unwrapped collateral
+                close_account(CpiContext::new_with_signer(
+                    token_program.to_account_info(),
+                    CloseAccount {
+                        account: vault_canonical_token_account.to_account_info(),
                         destination: authority.to_account_info(),
                         authority: vault_acc_info,
                     },

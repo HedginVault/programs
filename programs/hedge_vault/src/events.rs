@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 
-use crate::{ProtocolStatus, StrategyType, VaultStatus};
+use crate::{
+    protocol::phoenix::{PhoenixCancelMode, PhoenixOrderKind, PhoenixSide},
+    ProtocolStatus, StrategyType, VaultStatus,
+};
 
 // Config
 
@@ -263,4 +266,60 @@ pub struct MeteoraDlmmFeeClaimed {
     pub token_y_mint: Pubkey,
     pub vault_retained_x: u64,
     pub vault_retained_y: u64,
+}
+
+#[event]
+pub struct PhoenixFundsDeposited {
+    pub vault: Pubkey,
+    pub strategy: Pubkey,
+    pub trader_account: Pubkey,
+    pub amount: u64,
+    pub strategy_id: u32,
+}
+
+#[event]
+pub struct PhoenixFundsWithdrawn {
+    pub vault: Pubkey,
+    pub strategy: Pubkey,
+    pub trader_account: Pubkey,
+    pub requested: u64,
+    /// Canonical tokens paid out now and unwrapped into USDC, zero when the throttle queued it.
+    pub received: u64,
+    pub queued: bool,
+    pub strategy_id: u32,
+}
+
+#[event]
+pub struct PhoenixCanonicalUnwrapped {
+    pub vault: Pubkey,
+    pub strategy: Pubkey,
+    pub amount: u64,
+    pub strategy_id: u32,
+}
+
+#[event]
+pub struct PhoenixOrderPlaced {
+    pub vault: Pubkey,
+    pub strategy: Pubkey,
+    pub orderbook: Pubkey,
+    pub side: PhoenixSide,
+    pub kind: PhoenixOrderKind,
+    pub price_in_ticks: Option<u64>,
+    pub num_base_lots: u64,
+    pub reduce_only: bool,
+    pub base_lots_filled: u64,
+    pub quote_lots_filled: u64,
+    pub base_lots_posted: u64,
+    /// Set when part of the order rested on the book, the id cancels it by id.
+    pub order_sequence_number: Option<u64>,
+    pub strategy_id: u32,
+}
+
+#[event]
+pub struct PhoenixOrdersCancelled {
+    pub vault: Pubkey,
+    pub strategy: Pubkey,
+    pub orderbook: Pubkey,
+    pub mode: PhoenixCancelMode,
+    pub strategy_id: u32,
 }

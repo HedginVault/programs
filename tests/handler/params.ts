@@ -27,3 +27,6 @@ export const TARGET_MINT = new PublicKey(
 /// Meteora DLMM pool and the position registered as a strategy.
 export const LB_PAIR = new PublicKey("11111111111111111111111111111111");
 export const DLMM_POSITION = new PublicKey("11111111111111111111111111111111");
+
+/// Phoenix perp market traded by the order handlers, see /v1/view/exchange/markets.
+export const PHOENIX_SYMBOL = "SOL";
