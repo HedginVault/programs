@@ -30,6 +30,15 @@ Strategies: `jupiter_initialize_strategy` / `jupiter_swap`,
 `meteora_dlmm_initialize_position` / `meteora_dlmm_add_liquidity` / `meteora_dlmm_remove_liquidity` /
 `meteora_dlmm_claim_fee` (10% of claimed fees to the treasury), `vault_close_strategy`.
 
+DLMM positions start at 1–70 bins. The manager can call `meteora_dlmm_extend_position`
+repeatedly to add 1–91 bins to the upper end per transaction, up to 1,400 bins total.
+The authority pays the extra account rent. Confirm each extension before using the new
+range for liquidity; clients must split wide add/remove/claim work into transactions
+that fit Solana's transaction size and compute limits. For partial unwinds and fee
+claims, use `meteora_dlmm_remove_liquidity_range` and `meteora_dlmm_claim_fee_range`
+with inclusive bin bounds inside the position. The original instructions still
+cover the full position range.
+
 **User**
 `deposit_request_create` → (NAV posted in a later epoch) → `deposit_request_resolve`
 `withdrawal_request_create` → (NAV posted in a later epoch) → `withdrawal_request_resolve`

@@ -14,6 +14,7 @@ use crate::{
     },
     error::HedgeVaultError,
     events::MeteoraDlmmFeeClaimed,
+    instructions::meteora_dlmm_bin_range::checked_bin_range,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, SafeConvert, SafeMath, Strategy, StrategyType,
     Vault, MAX_BPS, TREASURY_CLAIM_FEE_BPS,
@@ -90,6 +91,7 @@ impl<'info> MeteoraDlmmClaimFee<'info> {
     pub fn handler(
         ctx: Context<'_, '_, '_, 'info, MeteoraDlmmClaimFee<'info>>,
         remaining_accounts_info: RemainingAccountsInfo,
+        requested_range: Option<(i32, i32)>,
     ) -> Result<()> {
         let MeteoraDlmmClaimFee {
             authority,
@@ -162,8 +164,11 @@ impl<'info> MeteoraDlmmClaimFee<'info> {
 
         let position_acc_info = position.to_account_info();
         let position = position.load()?;
-        let lower_bin_id = position.lower_bin_id;
-        let upper_bin_id = position.upper_bin_id;
+        let (lower_bin_id, upper_bin_id) = checked_bin_range(
+            position.lower_bin_id,
+            position.upper_bin_id,
+            requested_range,
+        )?;
         drop(position);
 
         let balance_x_before = vault_token_x.amount;

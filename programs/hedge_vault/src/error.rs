@@ -153,4 +153,6 @@ pub enum HedgeVaultError {
     VaultDepositPaused,
     #[msg("Vault withdrawals are paused by the manager")]
     VaultWithdrawalPaused,
+    #[msg("Position bin range is outside the supported bounds")]
+    InvalidPositionBinRange,
 }

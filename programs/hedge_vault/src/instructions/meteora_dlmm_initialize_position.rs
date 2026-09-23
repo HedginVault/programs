@@ -6,10 +6,22 @@ use crate::{
         cpi::{accounts::InitializePosition2, initialize_position2},
         ID as dlmm_ID,
     },
+    error::HedgeVaultError,
     events::StrategyInitialized,
     seeds::{CONFIG, STRATEGY, VAULT},
     vault_seeds, Config, NewStrategyArgs, Strategy, StrategyType, Vault,
 };
+
+fn initial_width(lower_bin_id: i32, upper_bin_id: i32) -> Result<i32> {
+    let width = upper_bin_id
+        .checked_sub(lower_bin_id)
+        .ok_or(HedgeVaultError::InvalidPositionBinRange)?;
+    require!(
+        (1..=70).contains(&width),
+        HedgeVaultError::InvalidPositionBinRange
+    );
+    Ok(width)
+}
 
 #[derive(Accounts)]
 pub struct MeteoraDlmmInitializePosition<'info> {
@@ -102,7 +114,7 @@ impl<'info> MeteoraDlmmInitializePosition<'info> {
         });
 
         // vault is the owner of the position
-        let width = upper_bin_id - lower_bin_id;
+        let width = initial_width(lower_bin_id, upper_bin_id)?;
         initialize_position2(
             CpiContext::new(
                 dlmm_program.to_account_info(),
@@ -122,5 +134,18 @@ impl<'info> MeteoraDlmmInitializePosition<'info> {
         )?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn initial_position_respects_meteora_limit() {
+        assert_eq!(initial_width(-35, 35).unwrap(), 70);
+        for (lower, upper) in [(0, 0), (0, 71), (i32::MIN, i32::MAX)] {
+            assert!(initial_width(lower, upper).is_err());
+        }
     }
 }

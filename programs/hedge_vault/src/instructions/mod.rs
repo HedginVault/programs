@@ -48,6 +48,9 @@ pub use meteora_dlmm_claim_fee::*;
 
 pub mod meteora_dlmm_initialize_position;
 pub use meteora_dlmm_initialize_position::*;
+pub mod meteora_dlmm_extend_position;
+pub use meteora_dlmm_extend_position::*;
+pub mod meteora_dlmm_bin_range;
 
 pub mod meteora_dlmm_remove_liquidity;
 pub use meteora_dlmm_remove_liquidity::*;

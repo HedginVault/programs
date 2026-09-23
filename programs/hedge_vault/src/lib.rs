@@ -165,6 +165,13 @@ pub mod hedge_vault {
         MeteoraDlmmInitializePosition::handler(ctx, lower_bin_id, upper_bin_id)
     }
 
+    pub fn meteora_dlmm_extend_position(
+        ctx: Context<MeteoraDlmmExtendPosition>,
+        bins_to_add: u16,
+    ) -> Result<()> {
+        MeteoraDlmmExtendPosition::handler(ctx, bins_to_add)
+    }
+
     pub fn meteora_dlmm_add_liquidity<'info>(
         ctx: Context<'_, '_, '_, 'info, MeteoraDlmmAddLiquidity<'info>>,
         params: MeteoraDlmmAddLiquidityParams,
@@ -176,13 +183,31 @@ pub mod hedge_vault {
         ctx: Context<'_, '_, '_, 'info, MeteoraDlmmRemoveLiquidity<'info>>,
         params: MeteoraDlmmRemoveLiquidityParams,
     ) -> Result<()> {
-        MeteoraDlmmRemoveLiquidity::handler(ctx, params)
+        MeteoraDlmmRemoveLiquidity::handler(ctx, params, None)
+    }
+
+    pub fn meteora_dlmm_remove_liquidity_range<'info>(
+        ctx: Context<'_, '_, '_, 'info, MeteoraDlmmRemoveLiquidity<'info>>,
+        params: MeteoraDlmmRemoveLiquidityParams,
+        from_bin_id: i32,
+        to_bin_id: i32,
+    ) -> Result<()> {
+        MeteoraDlmmRemoveLiquidity::handler(ctx, params, Some((from_bin_id, to_bin_id)))
     }
 
     pub fn meteora_dlmm_claim_fee<'info>(
         ctx: Context<'_, '_, '_, 'info, MeteoraDlmmClaimFee<'info>>,
         remaining_accounts_info: dlmm::types::RemainingAccountsInfo,
     ) -> Result<()> {
-        MeteoraDlmmClaimFee::handler(ctx, remaining_accounts_info)
+        MeteoraDlmmClaimFee::handler(ctx, remaining_accounts_info, None)
+    }
+
+    pub fn meteora_dlmm_claim_fee_range<'info>(
+        ctx: Context<'_, '_, '_, 'info, MeteoraDlmmClaimFee<'info>>,
+        remaining_accounts_info: dlmm::types::RemainingAccountsInfo,
+        from_bin_id: i32,
+        to_bin_id: i32,
+    ) -> Result<()> {
+        MeteoraDlmmClaimFee::handler(ctx, remaining_accounts_info, Some((from_bin_id, to_bin_id)))
     }
 }

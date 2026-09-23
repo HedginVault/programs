@@ -14,6 +14,7 @@ use crate::{
     },
     error::HedgeVaultError,
     events::MeteoraDlmmLiquidityRemoved,
+    instructions::meteora_dlmm_bin_range::checked_bin_range,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
 };
@@ -83,6 +84,7 @@ impl<'info> MeteoraDlmmRemoveLiquidity<'info> {
     pub fn handler(
         ctx: Context<'_, '_, '_, 'info, MeteoraDlmmRemoveLiquidity<'info>>,
         params: MeteoraDlmmRemoveLiquidityParams,
+        requested_range: Option<(i32, i32)>,
     ) -> Result<()> {
         let MeteoraDlmmRemoveLiquidity {
             authority,
@@ -157,8 +159,11 @@ impl<'info> MeteoraDlmmRemoveLiquidity<'info> {
 
         let position_acc_info = position.to_account_info();
         let position = position.load()?;
-        let lower_bin_id = position.lower_bin_id;
-        let upper_bin_id = position.upper_bin_id;
+        let (lower_bin_id, upper_bin_id) = checked_bin_range(
+            position.lower_bin_id,
+            position.upper_bin_id,
+            requested_range,
+        )?;
         drop(position);
 
         // remove liquidity across the full position range, fees stay in the position until claimed
