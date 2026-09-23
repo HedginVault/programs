@@ -42,6 +42,11 @@ pub const START_TS: i64 = 100 * DAY;
 pub const ANCHOR_CONSTRAINT_ASSOCIATED: u32 =
     anchor_lang::error::ErrorCode::ConstraintAssociated as u32;
 
+/// Mirrors `protocol::phoenix`, the Phoenix program is not loaded in this harness.
+pub use hedge_vault::protocol::phoenix::{
+    PHOENIX_GLOBAL_CONFIGURATION, PHOENIX_LOG_AUTHORITY, PHOENIX_PROGRAM_ID,
+};
+
 /// Mirrors `protocol::jupiter::JUPITER_AGGREGATOR_EVENT_AUTHORITY`.
 pub const JUPITER_EVENT_AUTHORITY: Pubkey =
     hedge_vault::protocol::jupiter::JUPITER_AGGREGATOR_EVENT_AUTHORITY;
@@ -809,6 +814,40 @@ impl TestContext {
                 system_program: system_program::ID,
             },
             instruction::JupiterInitializeStrategy {},
+        );
+        self.send(&[initialize], &[])
+    }
+
+    /// Phoenix strategy for the vault's trader PDA. Every check below runs before the Phoenix
+    /// CPI, so the Phoenix program does not need to be loaded.
+    pub fn phoenix_initialize_strategy(
+        &mut self,
+        v: &TestVault,
+        canonical_mint: &Pubkey,
+    ) -> TransactionResult {
+        let trader_account = Pubkey::find_program_address(
+            &[b"trader", v.address.as_ref(), &[0, 0]],
+            &PHOENIX_PROGRAM_ID,
+        )
+        .0;
+
+        let initialize = ix(
+            accounts::PhoenixInitializeStrategy {
+                authority: self.admin.pubkey(),
+                config: config_pda(),
+                vault: v.address,
+                strategy: strategy_pda(&v.address, &trader_account),
+                trader_account,
+                canonical_mint: *canonical_mint,
+                vault_canonical_token_account: ata(&v.address, canonical_mint, &TOKEN_PROGRAM),
+                global_config: PHOENIX_GLOBAL_CONFIGURATION,
+                log_authority: PHOENIX_LOG_AUTHORITY,
+                phoenix_program: PHOENIX_PROGRAM_ID,
+                token_program: TOKEN_PROGRAM,
+                associated_token_program: anchor_spl::associated_token::ID,
+                system_program: system_program::ID,
+            },
+            instruction::PhoenixInitializeStrategy {},
         );
         self.send(&[initialize], &[])
     }

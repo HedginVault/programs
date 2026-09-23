@@ -9,6 +9,8 @@ pub enum StrategyType {
     JupiterSwap { target_mint: Pubkey },
     /// Liquidity providing on Meteora DLMM
     MeteoraDlmm { position: Pubkey },
+    /// Cross-margin trader account on Phoenix Perpetuals, authority = vault PDA
+    PhoenixPerp { trader_account: Pubkey },
 }
 
 impl StrategyType {
@@ -16,6 +18,7 @@ impl StrategyType {
         match self {
             StrategyType::JupiterSwap { .. } => 1 + size_of::<Pubkey>(),
             StrategyType::MeteoraDlmm { .. } => 1 + size_of::<Pubkey>(),
+            StrategyType::PhoenixPerp { .. } => 1 + size_of::<Pubkey>(),
         }
     }
 }

@@ -16,7 +16,7 @@ use crate::{
     events::MeteoraDlmmLiquidityRemoved,
     instructions::meteora_dlmm_bin_range::checked_bin_range,
     seeds::{CONFIG, STRATEGY, VAULT},
-    strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
+    strategy_seeds, validate, vault_seeds, Config, SafeMath, Strategy, StrategyType, Vault,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -166,6 +166,9 @@ impl<'info> MeteoraDlmmRemoveLiquidity<'info> {
         )?;
         drop(position);
 
+        let balance_x_before = vault_token_x.amount;
+        let balance_y_before = vault_token_y.amount;
+
         // remove liquidity across the full position range, fees stay in the position until claimed
         remove_liquidity_by_range2(
             CpiContext::new(
@@ -198,11 +201,21 @@ impl<'info> MeteoraDlmmRemoveLiquidity<'info> {
             remaining_accounts_info,
         )?;
 
+        vault_token_x.reload()?;
+        vault_token_y.reload()?;
+        let amount_x_received = vault_token_x.amount.safe_sub(balance_x_before)?;
+        let amount_y_received = vault_token_y.amount.safe_sub(balance_y_before)?;
+
         emit!(MeteoraDlmmLiquidityRemoved {
             vault: vault_key,
             strategy: strategy_key,
             position: position_key,
             bps_to_remove,
+            strategy_id: strategy.id,
+            token_x_mint: token_x_mint.key(),
+            token_y_mint: token_y_mint.key(),
+            amount_x_received,
+            amount_y_received,
         });
 
         Ok(())

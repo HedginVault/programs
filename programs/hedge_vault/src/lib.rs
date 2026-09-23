@@ -210,4 +210,49 @@ pub mod hedge_vault {
     ) -> Result<()> {
         MeteoraDlmmClaimFee::handler(ctx, remaining_accounts_info, Some((from_bin_id, to_bin_id)))
     }
+
+    // Phoenix
+
+    pub fn phoenix_initialize_strategy(ctx: Context<PhoenixInitializeStrategy>) -> Result<()> {
+        PhoenixInitializeStrategy::handler(ctx)
+    }
+
+    pub fn phoenix_deposit_funds<'info>(
+        ctx: Context<'_, '_, '_, 'info, PhoenixDepositFunds<'info>>,
+        amount: u64,
+    ) -> Result<()> {
+        PhoenixDepositFunds::handler(ctx, amount)
+    }
+
+    pub fn phoenix_place_market_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, PhoenixPlaceMarketOrder<'info>>,
+        params: PhoenixMarketOrderParams,
+    ) -> Result<()> {
+        PhoenixPlaceMarketOrder::handler(ctx, params)
+    }
+
+    pub fn phoenix_place_limit_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, PhoenixPlaceLimitOrder<'info>>,
+        params: PhoenixLimitOrderParams,
+    ) -> Result<()> {
+        PhoenixPlaceLimitOrder::handler(ctx, params)
+    }
+
+    pub fn phoenix_cancel_orders<'info>(
+        ctx: Context<'_, '_, '_, 'info, PhoenixCancelOrders<'info>>,
+        mode: protocol::phoenix::PhoenixCancelMode,
+    ) -> Result<()> {
+        PhoenixCancelOrders::handler(ctx, mode)
+    }
+
+    pub fn phoenix_withdraw_funds<'info>(
+        ctx: Context<'_, '_, '_, 'info, PhoenixWithdrawFunds<'info>>,
+        amount: u64,
+    ) -> Result<()> {
+        PhoenixWithdrawFunds::handler(ctx, amount)
+    }
+
+    pub fn phoenix_ember_withdraw(ctx: Context<PhoenixEmberWithdraw>) -> Result<()> {
+        PhoenixEmberWithdraw::handler(ctx)
+    }
 }

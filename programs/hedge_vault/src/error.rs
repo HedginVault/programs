@@ -153,6 +153,30 @@ pub enum HedgeVaultError {
     VaultDepositPaused,
     #[msg("Vault withdrawals are paused by the manager")]
     VaultWithdrawalPaused,
+
+    // Phoenix
+    #[msg("Phoenix strategies require a USDC deposit mint")]
+    InvalidPhoenixDepositMint,
+    #[msg("Trader account does not match the strategy")]
+    InvalidPhoenixTrader,
+    #[msg("Phoenix account does not match the global configuration")]
+    InvalidPhoenixAccount,
+    #[msg("Phoenix trader index accounts are malformed")]
+    InvalidPhoenixRemainingAccounts,
+    #[msg("Phoenix trader has not been onboarded")]
+    PhoenixTraderNotReady,
+    #[msg("Token movement did not match the requested amount")]
+    PhoenixAmountMismatch,
+    #[msg("Phoenix return data is missing or malformed")]
+    PhoenixReturnDataInvalid,
+    #[msg("Order left the Phoenix account liquidatable")]
+    PhoenixAccountLiquidatable,
+    #[msg("Order filled less than the requested minimum")]
+    PhoenixOrderUnderfilled,
+    #[msg("Phoenix strategy still holds collateral, positions or a queued withdrawal")]
+    PhoenixStrategyNotEmpty,
+
+    // Appended after Phoenix to preserve the upstream Phoenix error codes.
     #[msg("Position bin range is outside the supported bounds")]
     InvalidPositionBinRange,
 }

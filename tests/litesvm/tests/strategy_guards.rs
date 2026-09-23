@@ -93,3 +93,42 @@ fn paused_protocol_blocks_a_new_strategy() {
         HedgeVaultError::ProtocolNotOperational,
     );
 }
+
+#[test]
+fn phoenix_strategy_requires_a_usdc_vault() {
+    let mut ctx = TestContext::new();
+    let (v, canonical_mint) = vault_and_target(&mut ctx);
+
+    assert_error(
+        ctx.phoenix_initialize_strategy(&v, &canonical_mint),
+        HedgeVaultError::InvalidPhoenixDepositMint,
+    );
+}
+
+#[test]
+fn paused_vault_blocks_a_new_phoenix_strategy() {
+    let mut ctx = TestContext::new();
+    let (v, canonical_mint) = vault_and_target(&mut ctx);
+
+    ctx.vault_pause(&v).unwrap();
+
+    assert_error(
+        ctx.phoenix_initialize_strategy(&v, &canonical_mint),
+        HedgeVaultError::VaultNotOperational,
+    );
+}
+
+#[test]
+fn paused_protocol_blocks_a_new_phoenix_strategy() {
+    let mut ctx = TestContext::new();
+    let (v, canonical_mint) = vault_and_target(&mut ctx);
+
+    let mut args = TestContext::update_config_args();
+    args.status = Some(ProtocolStatus::Paused);
+    ctx.config_update(args).unwrap();
+
+    assert_error(
+        ctx.phoenix_initialize_strategy(&v, &canonical_mint),
+        HedgeVaultError::ProtocolNotOperational,
+    );
+}

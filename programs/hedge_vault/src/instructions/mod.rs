@@ -55,6 +55,27 @@ pub mod meteora_dlmm_bin_range;
 pub mod meteora_dlmm_remove_liquidity;
 pub use meteora_dlmm_remove_liquidity::*;
 
+pub mod phoenix_cancel_orders;
+pub use phoenix_cancel_orders::*;
+
+pub mod phoenix_deposit_funds;
+pub use phoenix_deposit_funds::*;
+
+pub mod phoenix_ember_withdraw;
+pub use phoenix_ember_withdraw::*;
+
+pub mod phoenix_initialize_strategy;
+pub use phoenix_initialize_strategy::*;
+
+pub mod phoenix_place_limit_order;
+pub use phoenix_place_limit_order::*;
+
+pub mod phoenix_place_market_order;
+pub use phoenix_place_market_order::*;
+
+pub mod phoenix_withdraw_funds;
+pub use phoenix_withdraw_funds::*;
+
 pub mod nav_override;
 pub use nav_override::*;
 
