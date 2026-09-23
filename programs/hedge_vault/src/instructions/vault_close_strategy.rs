@@ -8,7 +8,7 @@ use anchor_spl::{
 use crate::{
     config_seeds, dlmm,
     error::HedgeVaultError,
-    events::{StrategyClosed, StrategyClosedV2},
+    events::StrategyClosed,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, Strategy, StrategyType, Vault,
 };
@@ -79,10 +79,6 @@ impl<'info> VaultCloseStrategy<'info> {
         drop(vault);
 
         emit!(StrategyClosed {
-            vault: vault_key,
-            strategy: strategy.key(),
-        });
-        emit!(StrategyClosedV2 {
             vault: vault_key,
             strategy: strategy.key(),
             id: strategy.id,

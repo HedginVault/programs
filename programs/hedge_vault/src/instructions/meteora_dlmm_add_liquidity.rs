@@ -12,7 +12,7 @@ use crate::{
         types::{LiquidityParameterByStrategy, RemainingAccountsInfo},
     },
     error::HedgeVaultError,
-    events::{MeteoraDlmmLiquidityAdded, MeteoraDlmmLiquidityAddedV2},
+    events::MeteoraDlmmLiquidityAdded,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, SafeMath, Strategy, StrategyType, Vault,
 };
@@ -191,12 +191,7 @@ impl<'info> MeteoraDlmmAddLiquidity<'info> {
             position: position_key,
             amount_x,
             amount_y,
-        });
-        emit!(MeteoraDlmmLiquidityAddedV2 {
-            vault: vault_key,
-            strategy: strategy_key,
             strategy_id: strategy.id,
-            position: position_key,
             token_x_mint: token_x_mint.key(),
             token_y_mint: token_y_mint.key(),
             amount_x_spent,

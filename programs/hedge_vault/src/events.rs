@@ -196,29 +196,11 @@ pub struct StrategyInitialized {
     pub strategy: Pubkey,
     pub id: u32,
     pub strategy_type: StrategyType,
-}
-
-/// Versioned lifecycle event marking strategies whose complete cash-flow history can be
-/// reconstructed from the V2 accounting events.
-#[event]
-pub struct StrategyInitializedV2 {
-    pub vault: Pubkey,
-    pub strategy: Pubkey,
-    pub id: u32,
-    pub strategy_type: StrategyType,
     pub created_ts: i64,
 }
 
 #[event]
 pub struct StrategyClosed {
-    pub vault: Pubkey,
-    pub strategy: Pubkey,
-}
-
-/// Versioned audit event emitted before a Strategy account is closed. The original
-/// `StrategyClosed` event remains for backwards-compatible consumers.
-#[event]
-pub struct StrategyClosedV2 {
     pub vault: Pubkey,
     pub strategy: Pubkey,
     pub id: u32,
@@ -234,16 +216,7 @@ pub struct JupiterSwapped {
     pub source_mint: Pubkey,
     pub destination_mint: Pubkey,
     pub amount: u64,
-}
-
-/// Exact vault token-account deltas measured around the Jupiter CPI.
-#[event]
-pub struct JupiterSwappedV2 {
-    pub vault: Pubkey,
-    pub strategy: Pubkey,
     pub strategy_id: u32,
-    pub source_mint: Pubkey,
-    pub destination_mint: Pubkey,
     pub source_spent: u64,
     pub destination_received: u64,
 }
@@ -255,15 +228,7 @@ pub struct MeteoraDlmmLiquidityAdded {
     pub position: Pubkey,
     pub amount_x: u64,
     pub amount_y: u64,
-}
-
-/// Exact vault token-account debits measured around the add-liquidity CPI.
-#[event]
-pub struct MeteoraDlmmLiquidityAddedV2 {
-    pub vault: Pubkey,
-    pub strategy: Pubkey,
     pub strategy_id: u32,
-    pub position: Pubkey,
     pub token_x_mint: Pubkey,
     pub token_y_mint: Pubkey,
     pub amount_x_spent: u64,
@@ -276,20 +241,11 @@ pub struct MeteoraDlmmLiquidityRemoved {
     pub strategy: Pubkey,
     pub position: Pubkey,
     pub bps_to_remove: u16,
-}
-
-/// Exact vault token-account credits measured around the remove-liquidity CPI.
-#[event]
-pub struct MeteoraDlmmLiquidityRemovedV2 {
-    pub vault: Pubkey,
-    pub strategy: Pubkey,
     pub strategy_id: u32,
-    pub position: Pubkey,
     pub token_x_mint: Pubkey,
     pub token_y_mint: Pubkey,
     pub amount_x_received: u64,
     pub amount_y_received: u64,
-    pub bps_to_remove: u16,
 }
 
 #[event]
@@ -302,22 +258,9 @@ pub struct MeteoraDlmmFeeClaimed {
     pub amount_y: u64,
     pub treasury_amount_x: u64,
     pub treasury_amount_y: u64,
-}
-
-/// Claimed fees split into the exact vault credit, treasury debit, and amount retained
-/// by the vault. Amounts are base units of their corresponding mint.
-#[event]
-pub struct MeteoraDlmmFeeClaimedV2 {
-    pub vault: Pubkey,
-    pub strategy: Pubkey,
     pub strategy_id: u32,
-    pub position: Pubkey,
     pub token_x_mint: Pubkey,
     pub token_y_mint: Pubkey,
-    pub gross_amount_x: u64,
-    pub gross_amount_y: u64,
-    pub treasury_amount_x: u64,
-    pub treasury_amount_y: u64,
     pub vault_retained_x: u64,
     pub vault_retained_y: u64,
 }

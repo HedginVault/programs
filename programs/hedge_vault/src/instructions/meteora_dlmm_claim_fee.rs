@@ -13,7 +13,7 @@ use crate::{
         types::RemainingAccountsInfo,
     },
     error::HedgeVaultError,
-    events::{MeteoraDlmmFeeClaimed, MeteoraDlmmFeeClaimedV2},
+    events::MeteoraDlmmFeeClaimed,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, SafeConvert, SafeMath, Strategy, StrategyType,
     Vault, MAX_BPS, TREASURY_CLAIM_FEE_BPS,
@@ -230,18 +230,9 @@ impl<'info> MeteoraDlmmClaimFee<'info> {
             amount_y,
             treasury_amount_x,
             treasury_amount_y,
-        });
-        emit!(MeteoraDlmmFeeClaimedV2 {
-            vault: vault_key,
-            strategy: strategy_key,
             strategy_id: strategy.id,
-            position: position_key,
             token_x_mint: token_x_mint.key(),
             token_y_mint: token_y_mint.key(),
-            gross_amount_x: amount_x,
-            gross_amount_y: amount_y,
-            treasury_amount_x,
-            treasury_amount_y,
             vault_retained_x: amount_x.safe_sub(treasury_amount_x)?,
             vault_retained_y: amount_y.safe_sub(treasury_amount_y)?,
         });

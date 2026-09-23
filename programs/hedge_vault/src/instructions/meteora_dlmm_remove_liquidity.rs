@@ -13,7 +13,7 @@ use crate::{
         types::RemainingAccountsInfo,
     },
     error::HedgeVaultError,
-    events::{MeteoraDlmmLiquidityRemoved, MeteoraDlmmLiquidityRemovedV2},
+    events::MeteoraDlmmLiquidityRemoved,
     seeds::{CONFIG, STRATEGY, VAULT},
     strategy_seeds, validate, vault_seeds, Config, SafeMath, Strategy, StrategyType, Vault,
 };
@@ -206,17 +206,11 @@ impl<'info> MeteoraDlmmRemoveLiquidity<'info> {
             strategy: strategy_key,
             position: position_key,
             bps_to_remove,
-        });
-        emit!(MeteoraDlmmLiquidityRemovedV2 {
-            vault: vault_key,
-            strategy: strategy_key,
             strategy_id: strategy.id,
-            position: position_key,
             token_x_mint: token_x_mint.key(),
             token_y_mint: token_y_mint.key(),
             amount_x_received,
             amount_y_received,
-            bps_to_remove,
         });
 
         Ok(())

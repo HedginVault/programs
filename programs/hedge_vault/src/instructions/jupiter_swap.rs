@@ -7,7 +7,7 @@ use anchor_spl::{
 use crate::{
     config_seeds,
     error::HedgeVaultError,
-    events::{JupiterSwapped, JupiterSwappedV2},
+    events::JupiterSwapped,
     jupiter,
     protocol::jupiter::{
         max_amount_in, min_amount_out, JupiterSwapCpi, SwapMode, SwapVariant,
@@ -200,13 +200,7 @@ impl<'info> JupiterSwap<'info> {
             source_mint: source_mint.key(),
             destination_mint: destination_mint.key(),
             amount,
-        });
-        emit!(JupiterSwappedV2 {
-            vault: vault_key,
-            strategy: strategy_key,
             strategy_id: strategy.id,
-            source_mint: source_mint.key(),
-            destination_mint: destination_mint.key(),
             source_spent,
             destination_received,
         });

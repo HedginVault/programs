@@ -6,7 +6,7 @@ use crate::{
         cpi::{accounts::InitializePosition2, initialize_position2},
         ID as dlmm_ID,
     },
-    events::{StrategyInitialized, StrategyInitializedV2},
+    events::StrategyInitialized,
     seeds::{CONFIG, STRATEGY, VAULT},
     vault_seeds, Config, NewStrategyArgs, Strategy, StrategyType, Vault,
 };
@@ -95,12 +95,6 @@ impl<'info> MeteoraDlmmInitializePosition<'info> {
         drop(vault);
 
         emit!(StrategyInitialized {
-            vault: vault_key,
-            strategy: strategy.key(),
-            id: strategy.id,
-            strategy_type: strategy.strategy_type,
-        });
-        emit!(StrategyInitializedV2 {
             vault: vault_key,
             strategy: strategy.key(),
             id: strategy.id,
