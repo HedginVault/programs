@@ -99,6 +99,7 @@ impl<'info> MeteoraDlmmInitializePosition<'info> {
             strategy: strategy.key(),
             id: strategy.id,
             strategy_type: strategy.strategy_type,
+            created_ts: now,
         });
 
         // vault is the owner of the position

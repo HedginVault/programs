@@ -196,12 +196,17 @@ pub struct StrategyInitialized {
     pub strategy: Pubkey,
     pub id: u32,
     pub strategy_type: StrategyType,
+    pub created_ts: i64,
 }
 
 #[event]
 pub struct StrategyClosed {
     pub vault: Pubkey,
     pub strategy: Pubkey,
+    pub id: u32,
+    pub strategy_type: StrategyType,
+    pub created_ts: i64,
+    pub closed_ts: i64,
 }
 
 #[event]
@@ -211,6 +216,9 @@ pub struct JupiterSwapped {
     pub source_mint: Pubkey,
     pub destination_mint: Pubkey,
     pub amount: u64,
+    pub strategy_id: u32,
+    pub source_spent: u64,
+    pub destination_received: u64,
 }
 
 #[event]
@@ -220,6 +228,11 @@ pub struct MeteoraDlmmLiquidityAdded {
     pub position: Pubkey,
     pub amount_x: u64,
     pub amount_y: u64,
+    pub strategy_id: u32,
+    pub token_x_mint: Pubkey,
+    pub token_y_mint: Pubkey,
+    pub amount_x_spent: u64,
+    pub amount_y_spent: u64,
 }
 
 #[event]
@@ -228,6 +241,11 @@ pub struct MeteoraDlmmLiquidityRemoved {
     pub strategy: Pubkey,
     pub position: Pubkey,
     pub bps_to_remove: u16,
+    pub strategy_id: u32,
+    pub token_x_mint: Pubkey,
+    pub token_y_mint: Pubkey,
+    pub amount_x_received: u64,
+    pub amount_y_received: u64,
 }
 
 #[event]
@@ -240,4 +258,9 @@ pub struct MeteoraDlmmFeeClaimed {
     pub amount_y: u64,
     pub treasury_amount_x: u64,
     pub treasury_amount_y: u64,
+    pub strategy_id: u32,
+    pub token_x_mint: Pubkey,
+    pub token_y_mint: Pubkey,
+    pub vault_retained_x: u64,
+    pub vault_retained_y: u64,
 }

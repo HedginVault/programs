@@ -230,6 +230,11 @@ impl<'info> MeteoraDlmmClaimFee<'info> {
             amount_y,
             treasury_amount_x,
             treasury_amount_y,
+            strategy_id: strategy.id,
+            token_x_mint: token_x_mint.key(),
+            token_y_mint: token_y_mint.key(),
+            vault_retained_x: amount_x.safe_sub(treasury_amount_x)?,
+            vault_retained_y: amount_y.safe_sub(treasury_amount_y)?,
         });
 
         Ok(())

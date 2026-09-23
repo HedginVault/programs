@@ -65,7 +65,10 @@ impl<'info> VaultCloseStrategy<'info> {
             StrategyType::JupiterSwap { target_mint } => target_mint,
         };
 
-        validate!(strategy.vault == vault_key, HedgeVaultError::InvalidStrategy)?;
+        validate!(
+            strategy.vault == vault_key,
+            HedgeVaultError::InvalidStrategy
+        )?;
         Strategy::validate_address(
             strategy_seeds!(vault_key, protocol_account, strategy.bump),
             strategy.key(),
@@ -78,6 +81,10 @@ impl<'info> VaultCloseStrategy<'info> {
         emit!(StrategyClosed {
             vault: vault_key,
             strategy: strategy.key(),
+            id: strategy.id,
+            strategy_type: strategy.strategy_type,
+            created_ts: strategy.created_ts,
+            closed_ts: Clock::get()?.unix_timestamp,
         });
 
         match strategy.strategy_type {
@@ -85,8 +92,7 @@ impl<'info> VaultCloseStrategy<'info> {
                 // [0] - position account
                 // [1] - dlmm_program
                 // [2] - dlmm_event_authority
-                let [position_account, dlmm_program, dlmm_event_authority] =
-                    ctx.remaining_accounts
+                let [position_account, dlmm_program, dlmm_event_authority] = ctx.remaining_accounts
                 else {
                     return Err(HedgeVaultError::InvalidRemainingAccounts.into());
                 };

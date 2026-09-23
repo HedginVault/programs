@@ -177,7 +177,8 @@ impl<'info> JupiterSwap<'info> {
         match variant.mode() {
             SwapMode::ExactIn => {
                 validate!(
-                    destination_received >= min_amount_out(route_args.quoted_amount, max_slippage_bps)?,
+                    destination_received
+                        >= min_amount_out(route_args.quoted_amount, max_slippage_bps)?,
                     HedgeVaultError::SwapOutputBelowMinimum
                 )?;
             }
@@ -199,6 +200,9 @@ impl<'info> JupiterSwap<'info> {
             source_mint: source_mint.key(),
             destination_mint: destination_mint.key(),
             amount,
+            strategy_id: strategy.id,
+            source_spent,
+            destination_received,
         });
 
         Ok(())
