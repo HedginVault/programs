@@ -33,8 +33,9 @@ Strategies: `jupiter_initialize_strategy` / `jupiter_swap`,
 DLMM positions start at 1–70 bins. The manager can call `meteora_dlmm_extend_position`
 repeatedly to add 1–91 bins to the upper end per transaction, up to 1,400 bins total.
 The authority pays the extra account rent. Confirm each extension before using the new
-range for liquidity; clients must split wide add/remove/claim work into transactions
-that fit Solana's transaction size and compute limits. For partial unwinds and fee
+range for liquidity. Hedge Vault rejects `meteora_dlmm_add_liquidity` ranges above
+91 bins; clients must split wide add/remove/claim work into transactions that fit Solana's
+transaction size and compute limits. For partial unwinds and fee
 claims, use `meteora_dlmm_remove_liquidity_range` and `meteora_dlmm_claim_fee_range`
 with inclusive bin bounds inside the position. The original instructions still
 cover the full position range.

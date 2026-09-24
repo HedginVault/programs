@@ -23,6 +23,20 @@ pub struct MeteoraDlmmAddLiquidityParams {
     pub remaining_accounts_info: RemainingAccountsInfo,
 }
 
+const MAX_LIQUIDITY_BINS_PER_IX: i32 = 91;
+
+fn validate_liquidity_range(min_bin_id: i32, max_bin_id: i32) -> Result<()> {
+    let width = max_bin_id
+        .checked_sub(min_bin_id)
+        .and_then(|span| span.checked_add(1))
+        .ok_or(HedgeVaultError::InvalidPositionBinRange)?;
+    require!(
+        (1..=MAX_LIQUIDITY_BINS_PER_IX).contains(&width),
+        HedgeVaultError::InvalidPositionBinRange
+    );
+    Ok(())
+}
+
 #[derive(Accounts)]
 pub struct MeteoraDlmmAddLiquidity<'info> {
     #[account(mut)]
@@ -103,6 +117,11 @@ impl<'info> MeteoraDlmmAddLiquidity<'info> {
             liquidity_parameter,
             remaining_accounts_info,
         } = params;
+
+        validate_liquidity_range(
+            liquidity_parameter.strategy_parameters.min_bin_id,
+            liquidity_parameter.strategy_parameters.max_bin_id,
+        )?;
 
         let vault_acc_info = vault.to_account_info();
 
@@ -199,5 +218,19 @@ impl<'info> MeteoraDlmmAddLiquidity<'info> {
         });
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn caps_each_liquidity_instruction_at_91_bins() {
+        assert!(validate_liquidity_range(-45, 45).is_ok());
+        assert!(validate_liquidity_range(0, 90).is_ok());
+        for (lower, upper) in [(0, 91), (1, 0), (i32::MIN, i32::MAX)] {
+            assert!(validate_liquidity_range(lower, upper).is_err());
+        }
     }
 }
