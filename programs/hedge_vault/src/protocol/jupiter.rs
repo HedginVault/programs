@@ -7,6 +7,7 @@ use std::mem::size_of;
 
 use crate::{
     error::HedgeVaultError,
+    jupiter::accounts::TokenLedger,
     jupiter::client::args::{
         ExactOutRoute, Route, RouteWithTokenLedger, SharedAccountsExactOutRoute,
         SharedAccountsRoute,
@@ -22,23 +23,6 @@ pub const JUPITER_AGGREGATOR_EVENT_AUTHORITY: Pubkey =
 const SLIPPAGE_TAIL: usize = size_of::<u16>() + size_of::<u8>();
 const ARGS_TAIL: usize = size_of::<u64>() * 2 + SLIPPAGE_TAIL;
 const TOKEN_LEDGER_ARGS_TAIL: usize = size_of::<u64>() + SLIPPAGE_TAIL;
-const TOKEN_LEDGER_DISCRIMINATOR: [u8; 8] = [156, 247, 9, 188, 54, 108, 85, 77];
-const TOKEN_LEDGER_LEN: usize =
-    TOKEN_LEDGER_DISCRIMINATOR.len() + size_of::<Pubkey>() + size_of::<u64>();
-
-fn token_ledger_source(data: &[u8]) -> Result<Pubkey> {
-    validate!(
-        data.len() >= TOKEN_LEDGER_LEN && data.starts_with(&TOKEN_LEDGER_DISCRIMINATOR),
-        HedgeVaultError::InvalidInstructionData
-    )?;
-
-    Ok(Pubkey::new_from_array(
-        data[TOKEN_LEDGER_DISCRIMINATOR.len()
-            ..TOKEN_LEDGER_DISCRIMINATOR.len() + size_of::<Pubkey>()]
-            .try_into()
-            .unwrap(),
-    ))
-}
 
 /// Which side of a routed swap the caller fixed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -315,7 +299,8 @@ impl<'info> JupiterSwapCpi<'info> {
                     HedgeVaultError::InvalidProgramId
                 )?;
                 validate!(
-                    token_ledger_source(&token_ledger.try_borrow_data()?)?
+                    TokenLedger::try_deserialize(&mut &token_ledger.try_borrow_data()?[..])?
+                        .token_account
                         == self.source_token_account.key(),
                     HedgeVaultError::InvalidTokenAccountOwner
                 )?;
@@ -338,7 +323,7 @@ impl<'info> JupiterSwapCpi<'info> {
                 );
 
                 let mut accounts = vec![
-                    AccountMeta::new_readonly(self.source_token_program.key(), false), // token program
+                    AccountMeta::new_readonly(token_program, false), // token program
                     AccountMeta::new_readonly(self.token_account_authority.key(), true), // user transfer authority
                     AccountMeta::new(self.source_token_account.key(), false), // user source token account
                     AccountMeta::new(self.destination_token_account.key(), false), // user destination token account
@@ -503,21 +488,6 @@ mod tests {
                 50,
                 300,
             ),
-            HedgeVaultError::InvalidInstructionData,
-        );
-    }
-
-    #[test]
-    fn token_ledger_source_validates_its_layout() {
-        let source = Pubkey::new_unique();
-        let mut data = TOKEN_LEDGER_DISCRIMINATOR.to_vec();
-        data.extend_from_slice(source.as_ref());
-        data.extend_from_slice(&42u64.to_le_bytes());
-
-        assert_eq!(token_ledger_source(&data).unwrap(), source);
-        data[0] ^= 1;
-        assert_err(
-            token_ledger_source(&data),
             HedgeVaultError::InvalidInstructionData,
         );
     }
