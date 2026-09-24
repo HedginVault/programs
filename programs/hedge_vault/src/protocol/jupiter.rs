@@ -7,7 +7,10 @@ use std::mem::size_of;
 
 use crate::{
     error::HedgeVaultError,
-    jupiter::client::args::{ExactOutRoute, Route, SharedAccountsExactOutRoute, SharedAccountsRoute},
+    jupiter::client::args::{
+        ExactOutRoute, Route, RouteWithTokenLedger, SharedAccountsExactOutRoute,
+        SharedAccountsRoute,
+    },
     validate, SafeConvert, SafeMath, MAX_BPS,
 };
 
@@ -18,6 +21,24 @@ pub const JUPITER_AGGREGATOR_EVENT_AUTHORITY: Pubkey =
 /// `amount: u64, quoted_amount: u64, slippage_bps: u16, platform_fee_bps: u8`.
 const SLIPPAGE_TAIL: usize = size_of::<u16>() + size_of::<u8>();
 const ARGS_TAIL: usize = size_of::<u64>() * 2 + SLIPPAGE_TAIL;
+const TOKEN_LEDGER_ARGS_TAIL: usize = size_of::<u64>() + SLIPPAGE_TAIL;
+const TOKEN_LEDGER_DISCRIMINATOR: [u8; 8] = [156, 247, 9, 188, 54, 108, 85, 77];
+const TOKEN_LEDGER_LEN: usize =
+    TOKEN_LEDGER_DISCRIMINATOR.len() + size_of::<Pubkey>() + size_of::<u64>();
+
+fn token_ledger_source(data: &[u8]) -> Result<Pubkey> {
+    validate!(
+        data.len() >= TOKEN_LEDGER_LEN && data.starts_with(&TOKEN_LEDGER_DISCRIMINATOR),
+        HedgeVaultError::InvalidInstructionData
+    )?;
+
+    Ok(Pubkey::new_from_array(
+        data[TOKEN_LEDGER_DISCRIMINATOR.len()
+            ..TOKEN_LEDGER_DISCRIMINATOR.len() + size_of::<Pubkey>()]
+            .try_into()
+            .unwrap(),
+    ))
+}
 
 /// Which side of a routed swap the caller fixed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,6 +53,7 @@ pub enum SwapMode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SwapVariant {
     Route,
+    RouteWithTokenLedger,
     ExactOutRoute,
     SharedAccountsRoute,
     SharedAccountsExactOutRoute,
@@ -42,6 +64,9 @@ impl SwapVariant {
         match swap_data {
             data if data.starts_with(ExactOutRoute::DISCRIMINATOR) => Ok(Self::ExactOutRoute),
             data if data.starts_with(Route::DISCRIMINATOR) => Ok(Self::Route),
+            data if data.starts_with(RouteWithTokenLedger::DISCRIMINATOR) => {
+                Ok(Self::RouteWithTokenLedger)
+            }
             data if data.starts_with(SharedAccountsExactOutRoute::DISCRIMINATOR) => {
                 Ok(Self::SharedAccountsExactOutRoute)
             }
@@ -54,9 +79,15 @@ impl SwapVariant {
 
     pub fn mode(self) -> SwapMode {
         match self {
-            Self::Route | Self::SharedAccountsRoute => SwapMode::ExactIn,
+            Self::Route | Self::RouteWithTokenLedger | Self::SharedAccountsRoute => {
+                SwapMode::ExactIn
+            }
             Self::ExactOutRoute | Self::SharedAccountsExactOutRoute => SwapMode::ExactOut,
         }
+    }
+
+    pub fn uses_token_ledger(self) -> bool {
+        matches!(self, Self::RouteWithTokenLedger)
     }
 }
 
@@ -85,6 +116,29 @@ impl RouteArgs {
             amount: u64::from_le_bytes(
                 swap_data[amount_offset..quoted_offset].try_into().unwrap(),
             ),
+            quoted_amount: u64::from_le_bytes(
+                swap_data[quoted_offset..bps_offset].try_into().unwrap(),
+            ),
+            slippage_bps: u16::from_le_bytes(
+                swap_data[bps_offset..bps_offset + size_of::<u16>()]
+                    .try_into()
+                    .unwrap(),
+            ),
+        })
+    }
+
+    pub fn parse_with_token_ledger(swap_data: &[u8]) -> Result<Self> {
+        validate!(
+            swap_data.len() >= TOKEN_LEDGER_ARGS_TAIL,
+            HedgeVaultError::InvalidInstructionData
+        )?;
+
+        let bps_offset = swap_data.len() - SLIPPAGE_TAIL;
+        let quoted_offset = bps_offset - size_of::<u64>();
+
+        Ok(Self {
+            // Jupiter reads the input from the token ledger captured earlier in the transaction.
+            amount: 0,
             quoted_amount: u64::from_le_bytes(
                 swap_data[quoted_offset..bps_offset].try_into().unwrap(),
             ),
@@ -132,9 +186,19 @@ impl<'info> JupiterSwapCpi<'info> {
         slippage_bps: u16,
         max_slippage_bps: u16,
     ) -> Result<RouteArgs> {
-        let args = RouteArgs::parse(swap_data)?;
-
-        require_eq!(amount, args.amount);
+        validate!(
+            swap_data.len() >= TOKEN_LEDGER_ARGS_TAIL,
+            HedgeVaultError::InvalidInstructionData
+        )?;
+        let variant = SwapVariant::from_swap_data(swap_data)?;
+        let args = if variant.uses_token_ledger() {
+            validate!(amount > 0, HedgeVaultError::InvalidInstructionData)?;
+            RouteArgs::parse_with_token_ledger(swap_data)?
+        } else {
+            let args = RouteArgs::parse(swap_data)?;
+            require_eq!(amount, args.amount);
+            args
+        };
         require_gte!(slippage_bps, args.slippage_bps);
 
         validate!(
@@ -240,6 +304,59 @@ impl<'info> JupiterSwapCpi<'info> {
 
                 (account_infos, accounts)
             }
+            SwapVariant::RouteWithTokenLedger => {
+                validate!(
+                    !remaining_accounts.is_empty(),
+                    HedgeVaultError::InvalidRemainingAccounts
+                )?;
+                let token_ledger = &remaining_accounts[0];
+                validate!(
+                    *token_ledger.owner == self.jupiter_program.key(),
+                    HedgeVaultError::InvalidProgramId
+                )?;
+                validate!(
+                    token_ledger_source(&token_ledger.try_borrow_data()?)?
+                        == self.source_token_account.key(),
+                    HedgeVaultError::InvalidTokenAccountOwner
+                )?;
+                let mut account_infos = vec![
+                    self.source_token_program.to_account_info(),
+                    self.destination_token_program.to_account_info(),
+                    self.token_account_authority.to_account_info(),
+                    self.source_token_account.to_account_info(),
+                    self.destination_token_account.to_account_info(),
+                    self.destination_mint.to_account_info(),
+                    token_ledger.to_account_info(),
+                    self.event_authority.to_account_info(),
+                    self.jupiter_program.to_account_info(),
+                ];
+                account_infos.extend(
+                    remaining_accounts
+                        .iter()
+                        .skip(1)
+                        .map(|acc| AccountInfo { ..acc.clone() }),
+                );
+
+                let mut accounts = vec![
+                    AccountMeta::new_readonly(self.source_token_program.key(), false), // token program
+                    AccountMeta::new_readonly(self.token_account_authority.key(), true), // user transfer authority
+                    AccountMeta::new(self.source_token_account.key(), false), // user source token account
+                    AccountMeta::new(self.destination_token_account.key(), false), // user destination token account
+                    AccountMeta::new_readonly(self.jupiter_program.key(), false), // [optional] destination token account
+                    AccountMeta::new_readonly(self.destination_mint.key(), false), // destination mint
+                    AccountMeta::new_readonly(self.jupiter_program.key(), false), // [optional] platform fee account
+                    AccountMeta::new_readonly(token_ledger.key(), false),
+                    AccountMeta::new_readonly(self.event_authority.key(), false),
+                    AccountMeta::new_readonly(self.jupiter_program.key(), false),
+                ];
+                accounts.extend(remaining_accounts.iter().skip(1).map(|acc| AccountMeta {
+                    pubkey: *acc.key,
+                    is_signer: acc.is_signer,
+                    is_writable: acc.is_writable,
+                }));
+
+                (account_infos, accounts)
+            }
             SwapVariant::SharedAccountsExactOutRoute | SwapVariant::SharedAccountsRoute => {
                 let mut account_infos = vec![
                     self.source_token_program.to_account_info(),
@@ -327,6 +444,16 @@ mod tests {
         data
     }
 
+    fn token_ledger_route_data(quoted_amount: u64, slippage_bps: u16) -> Vec<u8> {
+        let mut data = RouteWithTokenLedger::DISCRIMINATOR.to_vec();
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&quoted_amount.to_le_bytes());
+        data.extend_from_slice(&slippage_bps.to_le_bytes());
+        data.push(0);
+
+        data
+    }
+
     fn assert_err<T: core::fmt::Debug>(result: Result<T>, error: HedgeVaultError) {
         assert_eq!(result.unwrap_err(), anchor_lang::error::Error::from(error));
     }
@@ -355,6 +482,44 @@ mod tests {
         }
 
         assert!(RouteArgs::parse(&vec![0u8; ARGS_TAIL]).is_ok());
+    }
+
+    #[test]
+    fn token_ledger_route_reads_quote_without_a_fixed_input() {
+        let data = token_ledger_route_data(2_000, 50);
+        let args = JupiterSwapCpi::check_amount_and_slippage(&data, 1_000, 50, 300).unwrap();
+
+        assert_eq!(args.amount, 0);
+        assert_eq!(args.quoted_amount, 2_000);
+        assert_eq!(args.slippage_bps, 50);
+    }
+
+    #[test]
+    fn token_ledger_route_rejects_a_zero_quote_input() {
+        assert_err(
+            JupiterSwapCpi::check_amount_and_slippage(
+                &token_ledger_route_data(2_000, 50),
+                0,
+                50,
+                300,
+            ),
+            HedgeVaultError::InvalidInstructionData,
+        );
+    }
+
+    #[test]
+    fn token_ledger_source_validates_its_layout() {
+        let source = Pubkey::new_unique();
+        let mut data = TOKEN_LEDGER_DISCRIMINATOR.to_vec();
+        data.extend_from_slice(source.as_ref());
+        data.extend_from_slice(&42u64.to_le_bytes());
+
+        assert_eq!(token_ledger_source(&data).unwrap(), source);
+        data[0] ^= 1;
+        assert_err(
+            token_ledger_source(&data),
+            HedgeVaultError::InvalidInstructionData,
+        );
     }
 
     #[test]
@@ -404,6 +569,12 @@ mod tests {
                 .unwrap()
                 .mode(),
             SwapMode::ExactOut
+        );
+        assert_eq!(
+            SwapVariant::from_swap_data(&token_ledger_route_data(0, 0))
+                .unwrap()
+                .mode(),
+            SwapMode::ExactIn
         );
         assert!(SwapVariant::from_swap_data(&[7u8; 32]).is_err());
     }
